@@ -1,0 +1,3 @@
+Manifest-Version: 1.0 
+Main-Class: org.hawk.game.MinaMain
+Class-Path: ./ ./lib/mina-core-2.0.7.jar ./lib/slf4j-api-1.6.6.jar
