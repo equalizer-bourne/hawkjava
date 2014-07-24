@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE hibernate-configuration PUBLIC
+          "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+          "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+
+<hibernate-configuration>
+	<session-factory>
+		<property name="dialect">
+			org.hibernate.dialect.MySQLDialect
+		</property>
+		
+		<!-- 基础属性设置-->
+		<property name="show_sql">false</property>
+		<property name="connection.useUnicode">true</property>
+		<property name="connection.characterEncoding">UTF-8</property>
+		<property name="current_session_context_class">thread</property>
+		<property name="connection.driver_class">com.mysql.jdbc.Driver</property>
+		
+		<!-- C3P0 连接池 -->
+		<!-- 最大连接数 -->
+		<property name="hibernate.c3p0.max_size">32</property>
+		<!-- 最小连接数 -->
+		<property name="hibernate.c3p0.min_size">8</property>
+		<!-- 获得连接的超时时间,如果超过这个时间,会抛出异常，单位毫秒 -->
+		<property name="hibernate.c3p0.timeout">2000</property>
+		<!-- 最大的PreparedStatement的数量 -->
+		<property name="hibernate.c3p0.max_statements">100</property>
+		<!-- 每隔60秒检查连接池里的空闲连接 ，单位是秒-->
+		<property name="hibernate.c3p0.idle_test_period">60</property>
+		<!-- 当连接池里面的连接用完的时候，C3P0一下获取的新的连接数 -->
+		<property name="hibernate.c3p0.acquire_increment">1</property>
+		<property name="hibernate.c3p0.acquireRetryAttempts">30</property>
+		<property name="hibernate.c3p0.acquireRetryDelay">2000</property>
+		<property name="hibernate.c3p0.breakAfterAcquireFailure">false</property>
+
+	</session-factory>
+</hibernate-configuration>

@@ -1,0 +1,26 @@
+option java_package = "com.hawk.game.protocol";
+
+// 协议ID定义列表
+enum PID
+{
+	// 数据封装
+	DATA_WRAPPER = 1;
+	// 秘钥交换
+	KEY_EXCHANGE = 2;	
+};
+
+message DataWarpper
+{
+	optional bytes data = 1;
+}
+ 
+message KeyExchange
+{
+	optional bytes keys = 1;	
+}
+
+message HeartBeat
+{
+	optional int timeStamp = 1;
+	optional bytes data = 2;
+}

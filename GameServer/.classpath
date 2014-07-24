@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/HawkUtil"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ServerProto"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/protobuf-java-2.5.0.jar" sourcepath="/Package/jars/protobuf-2.5.0.zip"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/antlr-2.7.6.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/c3p0-0.9.1.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/hibernate-jpa-2.0-api-1.0.1.Final.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/hibernate3.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/javassist-3.12.0.GA.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/jta-1.1.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.7"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/httpclient-4.3.4.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/httpcore-4.3.2.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

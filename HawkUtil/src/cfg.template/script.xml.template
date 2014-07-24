@@ -1,0 +1,2 @@
+<script httpAddr="0.0.0.0:5132" whiteIptables="true" baseSrcDir="${app}/script" baseOutDir="${app}/script/bin">
+</script>
