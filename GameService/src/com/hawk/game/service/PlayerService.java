@@ -3,33 +3,27 @@ package com.hawk.game.service;
 import org.hawk.app.HawkAppObj;
 import org.hawk.msg.HawkMsg;
 import org.hawk.net.protocol.HawkProtocol;
-
-import com.hawk.game.player.GsPlayer;
 import com.hawk.game.service.GameService;
 
 /**
- * 玩家服务
+ * 鐜╁鏈嶅姟
  * 
  * @author hawk
  */
 public class PlayerService extends GameService {
 	/**
-	 * 协议处理
+	 * 娑堟伅鎷︽埅
 	 */
 	@Override
-	public boolean onProtocol(GsPlayer player, HawkProtocol protocol) {
-		if (protocol != null) {
-			player.sendProtocol(protocol);
-			return true;
-		}
+	public boolean onMessage(HawkAppObj appObj, HawkMsg msg) {
 		return false;
 	}
 
 	/**
-	 * 消息处理
+	 * 鍗忚鎷︽埅
 	 */
 	@Override
-	public boolean onMessage(HawkAppObj appObj, HawkMsg msg) {
+	public boolean onProtocol(HawkAppObj appObj, HawkProtocol protocol) {
 		return false;
 	}
 }
