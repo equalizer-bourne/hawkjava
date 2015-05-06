@@ -5,6 +5,7 @@ import java.util.LinkedList;
 
 import org.zeromq.ZMQ;
 import org.hawk.log.HawkLog;
+import org.hawk.nativeapi.HawkNativeApi;
 import org.hawk.octets.HawkOctetsStream;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkOSOperator;
@@ -66,6 +67,11 @@ public class HawkZmqManager {
 	 * @return
 	 */
 	public boolean init(int threads) {
+		// 检测
+		if (!HawkNativeApi.checkHawk()) {
+			return false;
+		}
+		
 		return setupZmqCtx(threads);
 	}
 
@@ -157,7 +163,7 @@ public class HawkZmqManager {
 					while (true) {
 						// 接收
 						stream.clear();
-						if (!zmqProxy.getFrontend().recv(stream.getBuffer(), 0)) {
+						if (zmqProxy.getFrontend().recv(stream.getBuffer(), 0) < 0) {
 							HawkLog.errPrintln("zmqproxy frontend recv error");
 							return false;
 						}
@@ -181,7 +187,7 @@ public class HawkZmqManager {
 					while (true) {
 						// 接收
 						stream.clear();
-						if (!zmqProxy.getBackend().recv(stream.getBuffer(), 0)) {
+						if (zmqProxy.getBackend().recv(stream.getBuffer(), 0) < 0) {
 							HawkLog.errPrintln("zmqproxy backend recv error");
 							return false;
 						}

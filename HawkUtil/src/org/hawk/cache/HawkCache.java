@@ -1,11 +1,10 @@
 package org.hawk.cache;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * 对象缓存管理器
+ * 对象缓存管理器(线程安全)
  * 
  * @author hawk
  * 
@@ -16,13 +15,9 @@ public class HawkCache {
 	 */
 	HawkCacheObj stub;
 	/**
-	 * 容器锁
-	 */
-	ReentrantLock lock;
-	/**
 	 * 缓存容器
 	 */
-	List<HawkCacheObj> cache;
+	Queue<HawkCacheObj> cache;
 
 	/**
 	 * 构造函数
@@ -41,13 +36,11 @@ public class HawkCache {
 	 */
 	public HawkCache(HawkCacheObj stub, int count) {
 		this.stub = stub;
-		this.lock = new ReentrantLock();
-		this.cache = new LinkedList<HawkCacheObj>();
+		this.cache = new ConcurrentLinkedQueue<HawkCacheObj>();
 
 		// 预开辟
 		for (int i = 0; i < count; i++) {
 			HawkCacheObj obj = stub.clone();
-			obj.cached = true;
 			cache.add(obj);
 		}
 	}
@@ -59,23 +52,10 @@ public class HawkCache {
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> T create() {
-		HawkCacheObj obj = null;
-		lock.lock();
-		try {
-			if (cache.size() > 0) {
-				obj = cache.remove(0);
-			} else {
-				obj = stub.clone();
-			}
-		} finally {
-			lock.unlock();
+		HawkCacheObj obj = cache.poll();
+		if (obj == null) {
+			obj = stub.clone();
 		}
-
-		// 清除缓存标记
-		if (obj != null) {
-			obj.cached = false;
-		}
-
 		return (T) obj;
 	}
 
@@ -85,15 +65,8 @@ public class HawkCache {
 	 * @param obj
 	 */
 	public void release(HawkCacheObj obj) {
-		lock.lock();
-		try {
-			// 判断缓存标记, 避免多次缓存
-			if (obj != null && !obj.cached) {
-				obj.cached = true;
-				cache.add(obj);
-			}
-		} finally {
-			lock.unlock();
+		if (obj != null) {
+			cache.add(obj);
 		}
 	}
 }

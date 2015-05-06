@@ -2,20 +2,30 @@ package org.hawk.net;
 
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 
 import org.apache.mina.core.service.IoConnector;
+import org.apache.mina.core.service.IoHandler;
 import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.filter.codec.ProtocolCodecFilter;
 import org.apache.mina.filter.executor.ExecutorFilter;
 import org.apache.mina.filter.executor.OrderedThreadPoolExecutor;
 import org.apache.mina.transport.socket.nio.NioSocketAcceptor;
 import org.apache.mina.transport.socket.nio.NioSocketConnector;
+import org.hawk.app.HawkApp;
 import org.hawk.app.HawkAppCfg;
 import org.hawk.codec.HawkDecoder;
 import org.hawk.codec.HawkEncoder;
+import org.hawk.log.HawkLog;
+import org.hawk.nativeapi.HawkNativeApi;
 import org.hawk.net.client.HawkClientIoHandler;
+import org.hawk.net.protocol.HawkProtocol;
 import org.hawk.os.HawkException;
+import org.hawk.script.HawkScriptManager;
+
+import com.sun.net.httpserver.HttpServer;
 
 /**
  * 网络管理器
@@ -26,7 +36,7 @@ public class HawkNetManager {
 	/**
 	 * 会话缓冲区大小
 	 */
-	private int sessionBufSize = 2048;
+	private int sessionBufSize = 4096;
 	/**
 	 * 最大会话数限制
 	 */
@@ -43,6 +53,10 @@ public class HawkNetManager {
 	 * 是否允许加密
 	 */
 	private boolean enableEncryption = false;
+	/**
+	 * 内嵌http服务器
+	 */
+	private HttpServer httpServer = null;
 	/**
 	 * 网络接收器
 	 */
@@ -95,31 +109,58 @@ public class HawkNetManager {
 	 * @param port
 	 * @return
 	 */
-	public boolean init(int port, int ioFilterChain) {
+	public boolean init(int port, int ioFilterChain, boolean asHttp) {
+		if (asHttp) {
+			return setupHttpServer(port, ioFilterChain);
+		}
+		
+		return init(port, ioFilterChain, null);
+	}
+	
+	/**
+	 * 初始化网络, 开启接收器
+	 * 
+	 * @param port
+	 * @return
+	 */
+	public boolean init(int port, int ioFilterChain, IoHandler ioHandler) {
 		try {
-			// 服务端的实例
-			acceptor = new NioSocketAcceptor();
-			// 地址重用
-			acceptor.getSessionConfig().setReuseAddress(true);
-			// 设置读取数据的缓冲区大小
-			acceptor.getSessionConfig().setReadBufferSize(HawkNetManager.getInstance().getSessionBufSize());
-			// 读写通道无操作进入空闲状态
-			acceptor.getSessionConfig().setIdleTime(IdleStatus.BOTH_IDLE, HawkNetManager.getInstance().getSessionIdleTime());
-			// 设置编码器&解码器
-			acceptor.getFilterChain().addLast("codec", new ProtocolCodecFilter(HawkEncoder.class, HawkDecoder.class));
-			// 添加IoFilterChain线程池
-			if (ioFilterChain > 0) {
-				OrderedThreadPoolExecutor executor = new OrderedThreadPoolExecutor(Runtime.getRuntime().availableProcessors() + 1);
-				acceptor.getFilterChain().addLast("threadPool", new ExecutorFilter(executor));
+			if (port <= 0) {
+				return false;
 			}
-			// 设置服务端的handler
-			if (ioHandler == null) {
-				ioHandler = new HawkIoHandler();
+			
+			if (acceptor == null) {
+				// 服务端的实例
+				acceptor = new NioSocketAcceptor();
+				// 地址重用
+				acceptor.getSessionConfig().setReuseAddress(true);
+				acceptor.getSessionConfig().setSoLinger(0);
+				// 设置读取数据的缓冲区大小
+				acceptor.getSessionConfig().setReadBufferSize(HawkNetManager.getInstance().getSessionBufSize());
+				// 读写通道无操作进入空闲状态
+				acceptor.getSessionConfig().setIdleTime(IdleStatus.BOTH_IDLE, HawkNetManager.getInstance().getSessionIdleTime());
+				// 设置编码器&解码器
+				acceptor.getFilterChain().addLast("codec", new ProtocolCodecFilter(HawkEncoder.class, HawkDecoder.class));
+				// 添加IoFilterChain线程池
+				if (ioFilterChain > 0) {
+					OrderedThreadPoolExecutor executor = new OrderedThreadPoolExecutor(ioFilterChain);
+					acceptor.getFilterChain().addLast("threadPool", new ExecutorFilter(executor));
+				}
+				
+				// 设置服务端的handler
+				if(ioHandler != null) {
+					acceptor.setHandler(ioHandler);
+				} else {
+					if (this.ioHandler == null) {
+						this.ioHandler = new HawkIoHandler();
+					}
+					acceptor.setHandler(this.ioHandler);
+				}
+				
+	
+				// 绑定ip
+				acceptor.bind(new InetSocketAddress(port));
 			}
-			acceptor.setHandler(ioHandler);
-
-			// 绑定ip
-			acceptor.bind(new InetSocketAddress(port));
 			return true;
 		} catch (Exception e) {
 			HawkException.catchException(e);
@@ -128,60 +169,57 @@ public class HawkNetManager {
 	}
 
 	/**
-	 * 开启监听器(供内部使用)
+	 * 开启http服务器
 	 * 
 	 * @param port
-	 * @param handler
+	 * @param poolSize
 	 * @return
 	 */
-	public boolean setupAcceptor(int port, HawkIoHandler handler) {
+	public boolean setupHttpServer(int port, int poolSize) {
 		try {
-			// 服务端的实例
-			NioSocketAcceptor socketAcceptor = new NioSocketAcceptor();
-			// 地址重用
-			socketAcceptor.getSessionConfig().setReuseAddress(true);
-			// 设置读取数据的缓冲区大小
-			socketAcceptor.getSessionConfig().setReadBufferSize(HawkNetManager.getInstance().getSessionBufSize());
-			// 读写通道无操作进入空闲状态
-			socketAcceptor.getSessionConfig().setIdleTime(IdleStatus.BOTH_IDLE, HawkNetManager.getInstance().getSessionIdleTime());
-			// 设置编码器&解码器
-			socketAcceptor.getFilterChain().addLast("codec", new ProtocolCodecFilter(HawkEncoder.class, HawkDecoder.class));
-			// 设置服务端的handler
-			socketAcceptor.setHandler(handler);
-			// 绑定ip
-			socketAcceptor.bind(new InetSocketAddress(port));
+			httpServer = HttpServer.create(new InetSocketAddress(port), 0);
+			httpServer.setExecutor(Executors.newFixedThreadPool(poolSize));
+			httpServer.createContext("/protocol", new HawkHttpHandler());
+			httpServer.start();
+			
+			HawkLog.logPrintln("Http Server [" + "0.0.0.0:" + port + "/protocol] Start OK.");
 			return true;
 		} catch (Exception e) {
 			HawkException.catchException(e);
 		}
 		return false;
 	}
-
+	
 	/**
 	 * 从appCfg的配置初始化数据
 	 * 
 	 * @param appCfg
 	 */
 	public boolean initFromAppCfg(HawkAppCfg appCfg) {
-		if (appCfg.sessionMaxSize > 0) {
-			setSessionMaxSize(appCfg.sessionMaxSize);
+		// 检测
+		if (!HawkNativeApi.checkHawk()) {
+			return false;
+		}
+		
+		if (appCfg.getSessionMaxSize() > 0) {
+			setSessionMaxSize(appCfg.getSessionMaxSize());
 		}
 
-		setEnableEncryption(appCfg.sessionEncryption);
+		setEnableEncryption(appCfg.isSessionEncryption());
 
-		if (appCfg.sessionBuffSize > 0) {
-			setSessionBufSize(appCfg.sessionBuffSize);
+		if (appCfg.getSessionBuffSize() > 0) {
+			setSessionBufSize(appCfg.getSessionBuffSize());
 		}
 
-		if (appCfg.sessionIdleTime > 0) {
-			setSessionIdleTime(appCfg.sessionIdleTime);
+		if (appCfg.getSessionIdleTime() > 0) {
+			setSessionIdleTime(appCfg.getSessionIdleTime());
 		}
 
-		if (appCfg.sessionPPS > 0) {
-			setSessionPPS(appCfg.sessionPPS);
+		if (appCfg.getSessionPPS() > 0) {
+			setSessionPPS(appCfg.getSessionPPS());
 		}
 
-		return init(appCfg.acceptorPort, appCfg.ioFilterChain);
+		return init(appCfg.getAcceptorPort(), appCfg.getIoFilterChain(), appCfg.isHttpServer());
 	}
 
 	/**
@@ -203,8 +241,26 @@ public class HawkNetManager {
 				HawkException.catchException(e);
 			}
 		}
+
+		// 关闭所有会话
+		closeAllSession();
 	}
 
+	/**
+	 * 关闭所有会话
+	 */
+	public void closeAllSession() {
+		// 关闭所有会话
+		Set<HawkSession> sessions = HawkApp.getInstance().getActiveSessions();
+		for (HawkSession session : sessions) {
+			try {
+				session.close(true);
+			} catch (Exception e) {
+				HawkException.catchException(e);
+			}
+		}
+	}
+	
 	/**
 	 * 获取会话空闲超时时间
 	 * 
@@ -214,6 +270,15 @@ public class HawkNetManager {
 		return sessionIdleTime;
 	}
 
+	/**
+	 * 获取io接收器
+	 * 
+	 * @return
+	 */
+	public NioSocketAcceptor getAcceptor() {
+		return acceptor;
+	}
+	
 	/**
 	 * 获取io处理句柄对象
 	 * 
@@ -312,6 +377,10 @@ public class HawkNetManager {
 	public synchronized IoConnector getConnector() {
 		if (connector == null) {
 			connector = new NioSocketConnector();
+			// 添加IoFilterChain线程池
+			OrderedThreadPoolExecutor executor = new OrderedThreadPoolExecutor(Runtime.getRuntime().availableProcessors() + 1);
+			connector.getFilterChain().addLast("threadPool", new ExecutorFilter(executor));
+
 			connector.getFilterChain().addLast("codec", new ProtocolCodecFilter(HawkEncoder.class, HawkDecoder.class));
 			connector.setHandler(new HawkClientIoHandler());
 		}
@@ -376,6 +445,21 @@ public class HawkNetManager {
 	public boolean checkBlackIptables(String ip) {
 		if (!"127.0.0.1".equals(ip) && blackIptables.containsKey(ip)) {
 			return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * 系统协议处理
+	 * 
+	 * @param protocol
+	 * @return
+	 */
+	protected boolean onSysProtocol(HawkProtocol protocol) {
+		if (protocol.getType() == 0) {
+			if (HawkScriptManager.getInstance().onSysProtocol(protocol)) {
+				return true;
+			}
 		}
 		return false;
 	}

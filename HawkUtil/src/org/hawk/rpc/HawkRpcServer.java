@@ -143,4 +143,9 @@ public class HawkRpcServer extends HawkTickable implements Runnable {
 			update(eventTimeout);
 		}
 	}
+
+	@Override
+	public String getName() {
+		return this.getClass().getSimpleName();
+	}
 }

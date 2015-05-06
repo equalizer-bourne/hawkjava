@@ -44,7 +44,19 @@ public class HawkZmq {
 	 * 断开重连时间周期
 	 */
 	public static final int HZMQ_RECONNECT_IVL = 1000;
-
+	/**
+	 * 非阻塞
+	 */
+	public static final int HZMQ_NOBLOCK = 1;
+	/**
+	 * 不等待
+	 */
+    public static final int HZMQ_DONTWAIT = 1;
+    /**
+     * 继续发生
+     */
+    public static final int HZMQ_SNDMORE = 2;
+    
 	/**
 	 * Socket transport events (tcp and ipc only) 主要用作Monitor参数事件集
 	 * 
@@ -64,6 +76,27 @@ public class HawkZmq {
 		public static final int MONITOR_STOPPED = 1024;
 	}
 
+	/**
+	 * 可用类型定义
+	 * 
+	 * @author hawk
+	 */
+	public static final class ZmqType {
+	    public static final int PAIR = 0;
+	    public static final int PUB = 1;
+	    public static final int SUB = 2;
+	    public static final int REQ = 3;
+	    public static final int REP = 4;
+	    public static final int DEALER = 5;
+	    public static final int XREQ = DEALER;
+	    public static final int ROUTER = 6;
+	    public static final int XREP = ROUTER;
+	    public static final int PULL = 7;
+	    public static final int PUSH = 8;
+	    public static final int XPUB = 9;
+	    public static final int XSUB = 10;
+	}
+	
 	/**
 	 * 通信对象
 	 */
@@ -276,16 +309,16 @@ public class HawkZmq {
 	 * @param flag
 	 * @return
 	 */
-	public boolean recv(byte[] bytes, int flag) {
+	public int recv(byte[] bytes, int flag) {
 		if (socket != null && bytes.length > 0) {
 			try {
 				int recvSize = socket.recv(bytes, 0, bytes.length, flag);
-				return recvSize >= 0;
+				return recvSize;
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
 		}
-		return false;
+		return -1;
 	}
 
 	/**
@@ -295,17 +328,19 @@ public class HawkZmq {
 	 * @param flag
 	 * @return
 	 */
-	public boolean recv(ByteBuffer buffer, int flag) {
+	public int recv(ByteBuffer buffer, int flag) {
 		if (socket != null && buffer != null && buffer.capacity() > 0) {
 			try {
 				int recvSize = socket.recvZeroCopy(buffer, buffer.capacity(), flag);
-				buffer.flip();
-				return recvSize >= 0;
+				if (recvSize > 0) {
+					buffer.flip();
+					return recvSize;
+				}
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
 		}
-		return false;
+		return -1;
 	}
 
 	/**
@@ -325,7 +360,7 @@ public class HawkZmq {
 	}
 
 	/**
-	 * 检查事件
+	 * 检查可读事件(可写事件不检测)
 	 * 
 	 * @param timeout
 	 * @return
@@ -334,9 +369,9 @@ public class HawkZmq {
 		if (socket != null) {
 			// 初始创建
 			if (socketPoll == null) {
-				socketPoll = new ZMQ.PollItem[] { new ZMQ.PollItem(socket, ZMQ.Poller.POLLIN | ZMQ.Poller.POLLOUT | ZMQ.Poller.POLLERR) };
+				socketPoll = new ZMQ.PollItem[] { new ZMQ.PollItem(socket, ZMQ.Poller.POLLIN | ZMQ.Poller.POLLERR) };
 			}
-
+			
 			// 查询事件
 			try {
 				int eventCnt = ZMQ.poll(socketPoll, timeout);
@@ -390,8 +425,8 @@ public class HawkZmq {
 	 */
 	public HawkProtocol recvProtocol(int flag) {
 		checkStream();
-		if (recv(stream.getBuffer(), flag)) {
-			HawkProtocol protocol = new HawkProtocol();
+		if (recv(stream.getBuffer(), flag) > 0) {
+			HawkProtocol protocol = HawkProtocol.valueOf();
 			try {
 				if (protocol.decode(stream)) {
 					return protocol;
@@ -412,14 +447,14 @@ public class HawkZmq {
 		checkStream();
 		while ((pollEvent(HZMQ_EVENT_READ, 0)) > 0) {
 			stream.clear();
-			if (!recv(stream.getBuffer(), 0)) {
+			if (recv(stream.getBuffer(), 0) < 0) {
 				break;
 			}
 
 			// 接收消息帧剩余数据
 			while (socket.hasReceiveMore()) {
 				stream.clear();
-				if (!recv(stream.getBuffer(), 0)) {
+				if (recv(stream.getBuffer(), 0) < 0) {
 					break;
 				}
 			}
@@ -458,7 +493,7 @@ public class HawkZmq {
 		if (socket != null && monitor != null) {
 			// 初始创建
 			if (monitorPoll == null) {
-				monitorPoll = new ZMQ.PollItem[] { new ZMQ.PollItem(monitor, ZMQ.Poller.POLLIN | ZMQ.Poller.POLLOUT | ZMQ.Poller.POLLERR) };
+				monitorPoll = new ZMQ.PollItem[] { new ZMQ.PollItem(monitor, ZMQ.Poller.POLLIN | ZMQ.Poller.POLLERR) };
 			}
 
 			try {
@@ -474,7 +509,7 @@ public class HawkZmq {
 						events = HawkByteOrder.reverseShort(stream.readShort());
 					}
 
-					// 丢弃其他数据
+					// 读取其他数据
 					while (monitor.hasReceiveMore()) {
 						checkStream();
 						recvSize = monitor.recvZeroCopy(stream.getBuffer(), stream.getBuffer().capacity(), 0);

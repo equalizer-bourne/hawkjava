@@ -3,8 +3,11 @@ package org.hawk.msg;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import org.hawk.cache.HawkCacheObj;
+import org.hawk.app.HawkApp;
+import org.hawk.log.HawkLog;
+import org.hawk.os.HawkException;
 import org.hawk.os.HawkTime;
 import org.hawk.xid.HawkXID;
 
@@ -14,7 +17,29 @@ import org.hawk.xid.HawkXID;
  * @author hawk
  * 
  */
-public class HawkMsg extends HawkCacheObj {
+public class HawkMsg {
+	/**
+	 * 普通消息类型
+	 */
+	public static int MSG_NORMAL = 0;
+	/**
+	 * rpc请求消息
+	 */
+	public static int MSG_RPC_REQ = 1;
+	/**
+	 * rpc响应消息
+	 */
+	public static int MSG_RPC_RESP = 2;
+	
+	/**
+	 * rpc共享id
+	 */
+	private static AtomicInteger msgRpcId = new AtomicInteger();
+	
+	/**
+	 * 消息类型
+	 */
+	private int type;
 	/**
 	 * 消息数据信息
 	 */
@@ -36,10 +61,18 @@ public class HawkMsg extends HawkCacheObj {
 	 */
 	private List<Object> params;
 	/**
-	 * 消息标记
+	 * 用户数据
 	 */
-	private int flag;
-
+	private Object userData;
+	/**
+	 * 消息调用堆栈
+	 */
+	private String stackTrace;
+	/**
+	 * 全局请求id
+	 */
+	private int rpcId;
+	
 	/**
 	 * 消息构造函数, 外部不可见
 	 * 
@@ -48,6 +81,10 @@ public class HawkMsg extends HawkCacheObj {
 	protected HawkMsg(int msg) {
 		this.msg = msg;
 		this.setTime(HawkTime.getMillisecond());
+
+		if (HawkApp.getInstance().isDebug()) {
+			stackTrace = HawkException.formatStackTrace(Thread.currentThread().getStackTrace(), 3);
+		}
 	}
 
 	/**
@@ -73,12 +110,13 @@ public class HawkMsg extends HawkCacheObj {
 	 * 
 	 * @param xid
 	 */
-	public void setTarget(HawkXID xid) {
+	public HawkMsg setTarget(HawkXID xid) {
 		if (target != null) {
 			target.set(xid);
 		} else {
-			target = xid;
+			target = xid.clone();
 		}
+		return this;
 	}
 
 	/**
@@ -95,12 +133,13 @@ public class HawkMsg extends HawkCacheObj {
 	 * 
 	 * @param xid
 	 */
-	public void setSource(HawkXID xid) {
+	public HawkMsg setSource(HawkXID xid) {
 		if (source != null) {
 			source.set(xid);
 		} else {
-			source = xid;
+			source = xid.clone();
 		}
+		return this;
 	}
 
 	/**
@@ -114,6 +153,7 @@ public class HawkMsg extends HawkCacheObj {
 
 	/**
 	 * 获取消息产生时间
+	 * 
 	 * @return
 	 */
 	public long getTime() {
@@ -122,28 +162,12 @@ public class HawkMsg extends HawkCacheObj {
 
 	/**
 	 * 设置消息产生时间
+	 * 
 	 * @param time
 	 */
-	public void setTime(long time) {
+	public HawkMsg setTime(long time) {
 		this.time = time;
-	}
-	
-	/**
-	 * 设置消息标记
-	 * 
-	 * @param xid
-	 */
-	public void setFlag(int flag) {
-		this.flag = flag;
-	}
-
-	/**
-	 * 获取消息标记
-	 * 
-	 * @return
-	 */
-	public int getFlag() {
-		return flag;
+		return this;
 	}
 
 	/**
@@ -160,11 +184,12 @@ public class HawkMsg extends HawkCacheObj {
 	 * 
 	 * @param params
 	 */
-	public void pushParam(Object... params) {
+	public HawkMsg pushParam(Object... params) {
 		if (this.params == null) {
 			this.params = new ArrayList<Object>(params.length);
 		}
 		this.params.addAll(Arrays.asList(params));
+		return this;
 	}
 
 	/**
@@ -179,23 +204,123 @@ public class HawkMsg extends HawkCacheObj {
 	}
 
 	/**
-	 * 克隆对象
+	 * 获取参数列表
+	 * 
+	 * @return
 	 */
-	@Override
-	protected HawkCacheObj clone() {
-		return new HawkMsg(msg);
+	public List<Object> getParams() {
+		return params;
+	}
+	
+	/**
+	 * 打印调用堆栈
+	 */
+	public void printStackTrace() {
+		if (stackTrace != null) {
+			HawkLog.logPrintln(stackTrace);
+		}
 	}
 
 	/**
-	 * 清理数据
+	 * 获取用户数据
+	 * 
+	 * @return
 	 */
-	@Override
-	protected boolean clear() {
-		flag = 0;
-		setTime(0);
-		target.clear();
-		source.clear();
-		params.clear();
-		return true;
+	public Object getUserData() {
+		return userData;
+	}
+
+	/**
+	 * 设置用户数据
+	 * 
+	 * @param userData
+	 */
+	public HawkMsg setUserData(Object userData) {
+		this.userData = userData;
+		return this;
+	}
+
+	/**
+	 * 获取保留标记
+	 * 
+	 * @return
+	 */
+	public int getType() {
+		return type;
+	}
+
+	/**
+	 * 设置保留标记
+	 * 
+	 * @param type
+	 */
+	public HawkMsg setType(int type) {
+		this.type = type;
+		return this;
+	}
+	
+	/**
+	 * 获取请求id
+	 * 
+	 * @return
+	 */
+	public int getRpcId() {
+		return rpcId;
+	}
+
+	/**
+	 * 设置请求id
+	 * 
+	 * @param rpcId
+	 */
+	public HawkMsg setRpcId(int rpcId) {
+		this.rpcId = rpcId;
+		return this;
+	}
+	
+	/**
+	 * 构建rpc消息, 返回rpcid
+	 * @return
+	 */
+	public int buildRpcMsg() {
+		type = HawkMsg.MSG_RPC_REQ;
+		rpcId = msgRpcId.incrementAndGet();
+		return rpcId;
+	}
+	
+	/**
+	 * 创建对象
+	 * 
+	 * @param msg
+	 * @return
+	 */
+	public static HawkMsg valueOf(int msg) {
+		HawkMsg hawkMsg = new HawkMsg(msg);
+		return hawkMsg;
+	}
+
+	/**
+	 * 创建消息对象
+	 * 
+	 * @param msg
+	 * @return
+	 */
+	public static HawkMsg valueOf(int msg, HawkXID target) {
+		HawkMsg hawkMsg = new HawkMsg(msg);
+		hawkMsg.setTarget(target);
+		return hawkMsg;
+	}
+
+	/**
+	 * 创建消息对象
+	 * 
+	 * @param msg
+	 * @return
+	 */
+	public static HawkMsg valueOf(int msg, HawkXID target, HawkXID source) {
+		HawkMsg hawkMsg = new HawkMsg(msg);
+		hawkMsg.setTarget(target);
+		hawkMsg.setSource(source);
+		return hawkMsg;
 	}
 }

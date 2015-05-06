@@ -42,6 +42,13 @@ public class HawkDecryption {
 	}
 
 	/**
+	 * 重置
+	 */
+	public void resetInflater() {
+		inflater.reset();
+	}
+	
+	/**
 	 * 解密
 	 * 
 	 * @param input

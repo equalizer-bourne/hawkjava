@@ -1,5 +1,6 @@
 package org.hawk.app;
 
+import org.hawk.listener.HawkListener;
 import org.hawk.msg.HawkMsg;
 import org.hawk.net.protocol.HawkProtocol;
 
@@ -8,7 +9,7 @@ import org.hawk.net.protocol.HawkProtocol;
  * 
  * @author hawk
  */
-public class HawkObjModule {
+public class HawkObjModule extends HawkListener {
 	/**
 	 * 模块宿主对象
 	 */
@@ -48,7 +49,7 @@ public class HawkObjModule {
 	 * @return
 	 */
 	public boolean onMessage(HawkMsg msg) {
-		return false;
+		return super.invokeMessage(appObj, msg);
 	}
 
 	/**
@@ -58,6 +59,6 @@ public class HawkObjModule {
 	 * @return
 	 */
 	public boolean onProtocol(HawkProtocol protocol) {
-		return false;
+		return super.invokeProtocol(appObj, protocol);
 	}
 }

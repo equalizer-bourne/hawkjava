@@ -17,31 +17,31 @@ public class HawkThread extends Thread {
 	/**
 	 * 运行中
 	 */
-	private volatile boolean running;
+	protected volatile boolean running;
 	/**
 	 * 等待退出
 	 */
-	private volatile boolean waitBreak;
+	protected volatile boolean waitBreak;
 	/**
 	 * 线程任务队列
 	 */
-	private Deque<HawkTask> taskQueue;
+	protected Deque<HawkTask> taskQueue;
 	/**
 	 * 任务队列互斥锁
 	 */
-	private Lock queueLock;
+	protected Lock queueLock;
 	/**
 	 * 线程状态
 	 */
-	private ThreadState state;
+	protected ThreadState state;
 	/**
 	 * 添加的任务总数
 	 */
-	private long pushTaskCnt;
+	protected long pushTaskCnt;
 	/**
 	 * 执行的任务总数
 	 */
-	private long popTaskCnt;
+	protected long popTaskCnt;
 
 	/**
 	 * 状态定义
@@ -49,7 +49,7 @@ public class HawkThread extends Thread {
 	 * @author hawk
 	 * 
 	 */
-	private enum ThreadState {
+	protected enum ThreadState {
 		STATE_NONE, STATE_RUNNING, STATE_CLOSING, STATE_CLOSED
 	};
 
@@ -82,7 +82,7 @@ public class HawkThread extends Thread {
 	 * 
 	 * @return
 	 */
-	protected boolean close(boolean waitBreak) {
+	public boolean close(boolean waitBreak) {
 		if (this.running && !this.waitBreak) {
 			this.waitBreak = waitBreak;
 			if (!waitBreak) {
@@ -164,6 +164,15 @@ public class HawkThread extends Thread {
 	}
 
 	/**
+	 * 获取任务队列
+	 * 
+	 * @return
+	 */
+	public Deque<HawkTask> getTasks() {
+		return taskQueue;
+	}
+	
+	/**
 	 * 获取线程运行状态
 	 * 
 	 * @return
@@ -211,13 +220,22 @@ public class HawkThread extends Thread {
 					}
 				}
 	
-				if (task != null) {
-					task.run();
-					task.clear();
-				} else if (waitBreak) {
-					break;
+				if (waitBreak) {
+					if (task != null) {
+						if (task.isMustRun()) {
+							task.run();
+							task.clear();
+						}
+					} else {
+						break;
+					}
 				} else {
-					HawkOSOperator.sleep();
+					if (task != null) {
+						task.run();
+						task.clear();
+					} else {
+						HawkOSOperator.sleep();
+					}
 				}
 			} catch (Exception e) {
 				HawkException.catchException(e);

@@ -1,7 +1,7 @@
 package org.hawk.os;
 
+import org.hawk.app.HawkApp;
 import org.hawk.log.HawkLog;
-import org.slf4j.Logger;
 
 /**
  * hawk系统异常封装
@@ -54,20 +54,14 @@ public class HawkException extends Exception {
 	 * 异常捕获
 	 * @param e
 	 */
-	public static void catchException(Exception e) {
-		HawkLog.exceptionPrint(e);
-	}
-	
-	/**
-	 * 异常捕获
-	 * @param e
-	 */
-	public static void catchException(Exception e, Logger logger) {
-		// 打印堆栈
-		e.printStackTrace();
-				
-		// 异常信息按照错误打印
-		logger.error(HawkException.formatStackMsg(e));
+	public synchronized static void catchException(Exception e) {
+		if (e != null) {
+			HawkLog.exceptionPrint(e);
+			
+			if (HawkApp.getInstance() != null) {
+				HawkApp.getInstance().reportException(e);
+			}
+		}
 	}
 	
 	/**
@@ -75,16 +69,36 @@ public class HawkException extends Exception {
 	 * @param e
 	 * @return
 	 */
-	public static String formatStackMsg(Exception e) {		
-		StackTraceElement[] stackArray = e.getStackTrace();
-		
-		StringBuffer sb = new StringBuffer();
-		sb.append(e.toString() + "\n");
-		
-		for (int i = 0; i < stackArray.length; i++) {
-			StackTraceElement element = stackArray[i];
-			sb.append(element.toString() + "\n");
+	public static String formatStackMsg(Exception e) {	
+		if (e != null) {
+			StackTraceElement[] stackArray = e.getStackTrace();
+			StringBuffer sb = new StringBuffer();
+			sb.append(e.toString() + "\n");
+			
+			for (int i = 0; stackArray != null && i < stackArray.length; i++) {
+				StackTraceElement element = stackArray[i];
+				sb.append(element.toString() + "\n");
+			}
+			
+			return sb.toString();
 		}
-		return sb.toString();
+		return "";
+	}
+	
+	/**
+	 * 格式化异常堆栈结构
+	 * @param e
+	 * @return
+	 */
+	public static String formatStackTrace(StackTraceElement[] stackArray, int skipCount) {
+		if (stackArray != null) {
+			StringBuffer sb = new StringBuffer();
+			for (int i = skipCount; i < stackArray.length; i++) {
+				StackTraceElement element = stackArray[i];
+				sb.append(element.toString() + "\n");
+			}
+			return sb.toString();
+		}
+		return "";
 	}
 }

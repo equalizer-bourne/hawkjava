@@ -18,6 +18,11 @@ public abstract class HawkTickable {
 	public abstract void onTick();
 
 	/**
+	 * 获取名字
+	 */
+	public abstract String getName();
+	
+	/**
 	 * 是否有效
 	 * 
 	 * @return

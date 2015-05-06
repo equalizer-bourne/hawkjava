@@ -2,24 +2,35 @@ package org.hawk.net.protocol;
 
 import java.nio.ByteBuffer;
 
+import net.sf.json.JSONObject;
+
 import org.apache.mina.core.buffer.IoBuffer;
+import org.hawk.cache.HawkCache;
+import org.hawk.cache.HawkCacheObj;
 import org.hawk.net.HawkSession;
 import org.hawk.octets.HawkOctetsStream;
 import org.hawk.os.HawkException;
+import org.hawk.os.HawkOSOperator;
 
+import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.GeneratedMessage.Builder;
+import com.google.protobuf.ProtocolMessageEnum;
 
 /**
  * 协议包装类
  * 
  * @author hawk
  */
-public class HawkProtocol {
+public class HawkProtocol extends HawkCacheObj {
 	/**
 	 * 协议头字节数
 	 */
 	public static final int HEADER_SIZE = 16;
-
+	/**
+	 * 缓存对象
+	 */
+	private static HawkCache protocolCache = null;
+	
 	/*
 	 * 协议头格式
 	 */
@@ -59,6 +70,11 @@ public class HawkProtocol {
 			reserve = 0;
 			crc = 0;
 		}
+		
+		@Override
+		public String toString() {
+			return String.format("[type: %d, size: %d, reserve: %d, crc: %d]", type, size, reserve, crc);
+		}
 	}
 
 	/**
@@ -73,11 +89,159 @@ public class HawkProtocol {
 	 * 来源会话
 	 */
 	private HawkSession session;
+	/**
+	 * 需要发送的protobuf的builder对象
+	 */
+	private Builder<?> builder;
+	/**
+	 * 解析后的协议对象
+	 */
+	private Object parseObj;
+	
+	/**
+	 * 设置对象缓存
+	 * @param cache
+	 */
+	public static void setCache(HawkCache cache) {
+		protocolCache = cache;
+	}
+	
+	/**
+	 * 释放对象
+	 * @param protocol
+	 */
+	public static void release(HawkProtocol protocol) {
+		if (protocolCache != null) {
+			protocol.clear();
+			protocolCache.release(protocol);
+		}
+	}
+	
+	/**
+	 * 静态构建
+	 * 
+	 * @return
+	 */
+	public static HawkProtocol valueOf() {
+		if (protocolCache != null) {
+			return protocolCache.create();
+		}
+		return new HawkProtocol();
+	}
+	
+	/**
+	 * 静态构建
+	 * 
+	 * @param type
+	 * @return
+	 */
+	public static HawkProtocol valueOf(int type) {
+		HawkProtocol protocol = valueOf();
+		protocol.setType(type);
+		return protocol;
+	}
 
+	/**
+	 * 静态构建
+	 * 
+	 * @param type
+	 * @param bytes
+	 * @return
+	 */
+	public static HawkProtocol valueOf(int type, byte[] bytes) {
+		HawkProtocol protocol = valueOf(type);
+		try {
+			protocol.writeOctets(bytes);
+		} catch (Exception e) {
+			HawkException.catchException(e);
+			return null;
+		}
+		return protocol;
+	}
+
+	/**
+	 * 静态构建
+	 * 
+	 * @param type
+	 * @param builder
+	 * @return
+	 */
+	public static HawkProtocol valueOf(int type, Builder<?> builder) {
+		HawkProtocol protocol = valueOf(type);
+		try {
+			protocol.writeOctets(builder.build().toByteArray());
+			protocol.setBuilder(builder);
+		} catch (Exception e) {
+			HawkException.catchException(e);
+			return null;
+		}
+		return protocol;
+	}
+
+	/**
+	 * 静态构建
+	 * 
+	 * @param type
+	 * @param builder
+	 * @return
+	 */
+	public static HawkProtocol valueOf(ProtocolMessageEnum type, Builder<?> builder) {
+		HawkProtocol protocol = valueOf(type.getNumber());
+		try {
+			protocol.writeOctets(builder.build().toByteArray());
+			protocol.setBuilder(builder);
+		} catch (Exception e) {
+			HawkException.catchException(e);
+			return null;
+		}
+		return protocol;
+	}
+
+	/**
+	 * HawkPacket静态构建
+	 * 
+	 * @param type
+	 * @param builder
+	 * @return
+	 */
+	public static HawkProtocol valueOf(int type, HawkPacket packet) {
+		HawkProtocol protocol = valueOf(type);
+		try {
+			HawkOctetsStream stream = HawkOctetsStream.create();
+			packet.marshal(stream);
+			stream.flip();
+			protocol.writeOctets(stream.getBuffer());
+		} catch (Exception e) {
+			HawkException.catchException(e);
+			return null;
+		}
+		return protocol;
+	}
+	
+	/**
+	 * HawkPacket静态构建
+	 * 
+	 * @param packet
+	 * @return
+	 */
+	public static HawkProtocol valueOf(HawkPacket packet){
+		HawkProtocol protocol = valueOf(packet.getType());
+		try {
+			HawkOctetsStream stream = HawkOctetsStream.create();
+			packet.marshal(stream);
+			stream.flip();
+			protocol.writeOctets(stream.getBuffer());
+		} catch (Exception e) {
+			HawkException.catchException(e);
+			return null;
+		}
+		return protocol;
+	}
+	
 	/**
 	 * 构造函数
 	 */
-	public HawkProtocol() {
+	protected HawkProtocol() {
 		header = new ProtocolHeader(0);
 	}
 
@@ -86,44 +250,41 @@ public class HawkProtocol {
 	 * 
 	 * @param type
 	 */
-	public HawkProtocol(int type) {
+	protected HawkProtocol(int type) {
 		header = new ProtocolHeader(type);
 	}
 
 	/**
-	 * 构造函数
-	 * 
-	 * @param type
-	 * @param bytes
+	 * 数据清理
 	 */
-	public HawkProtocol(int type, byte[] bytes) {
-		this(type);
-
-		writeOctets(bytes);
+	public void clear() {
+		if (octets != null) {
+			octets.clear();
+		}
+		header.clear();
+		parseObj = null;
+		session  = null;
 	}
 
 	/**
-	 * 构造函数
-	 * 
-	 * @param type
-	 * @param buffer
+	 * 对象克隆
 	 */
-	public HawkProtocol(int type, ByteBuffer buffer) {
-		this(type);
-
-		writeOctets(buffer);
+	@Override
+	protected HawkCacheObj clone() {
+		return new HawkProtocol();
 	}
-
+	
 	/**
-	 * 构造函数
-	 * 
-	 * @param type
-	 * @param builder
+	 * 格式化字符串
 	 */
-	public HawkProtocol(int type, Builder<?> builder) {
-		this(type, builder.build().toByteArray());
+	@Override
+	public String toString() {
+		if (octets == null) {
+			return header.toString() + "\r\ndata: null\r\n";
+		}
+		return header.toString() + "\r\n" + "data: \r\n" + HawkOSOperator.bytesToHexString(octets.getBuffer().array(), octets.position(), octets.remaining());
 	}
-
+	
 	/**
 	 * 绑定会话来源
 	 * 
@@ -143,6 +304,30 @@ public class HawkProtocol {
 	}
 
 	/**
+	 * 检测协议类型
+	 * 
+	 * @return
+	 */
+	public boolean checkType(int type) {
+		if (header != null) {
+			return header.type == type;
+		}
+		return false;
+	}
+
+	/**
+	 * 检测协议类型
+	 * 
+	 * @return
+	 */
+	public boolean checkType(ProtocolMessageEnum type) {
+		if (header != null) {
+			return header.type == type.getNumber();
+		}
+		return false;
+	}
+
+	/**
 	 * 获得协议类型
 	 * 
 	 * @return
@@ -154,6 +339,18 @@ public class HawkProtocol {
 		return 0;
 	}
 
+	/**
+	 * 设置协议类型
+	 * 
+	 * @return
+	 */
+	public HawkProtocol setType(int type) {
+		if (header != null) {
+			header.type = type;
+		}
+		return this;
+	}
+	
 	/**
 	 * 获得协议大小
 	 * 
@@ -183,10 +380,11 @@ public class HawkProtocol {
 	 * 
 	 * @return
 	 */
-	public void setReserve(int reserve) {
+	public HawkProtocol setReserve(int reserve) {
 		if (header != null) {
 			header.reserve = reserve;
 		}
+		return this;
 	}
 
 	/**
@@ -211,6 +409,24 @@ public class HawkProtocol {
 	}
 
 	/**
+	 * 获取待发送pb的builder对象
+	 * 
+	 * @return
+	 */
+	public Builder<?> getBuilder() {
+		return builder;
+	}
+
+	/**
+	 * 设置待发送pb的builder对象
+	 * 
+	 * @param builder
+	 */
+	public void setBuilder(Builder<?> builder) {
+		this.builder = builder;
+	}
+	
+	/**
 	 * crc校验
 	 */
 	public boolean checkCrc(int crc) {
@@ -226,12 +442,14 @@ public class HawkProtocol {
 	public boolean encode(HawkOctetsStream os) {
 		// 协议编码
 		try {
+			// 有效协议头
 			os.writeInt(header.type);
 			os.writeInt(header.size);
 			os.writeInt(header.reserve);
 			os.writeInt(header.crc);
+			
 			if (header.size > 0) {
-				os.pushBuffer(octets.getBuffer());
+				os.pushBytes(octets.getBuffer().array(), octets.position(), octets.remaining());
 			}
 			return true;
 		} catch (Exception e) {
@@ -249,14 +467,14 @@ public class HawkProtocol {
 	public boolean encode(IoBuffer buffer) {
 		// 协议编码
 		try {
+			// 有效协议头
 			buffer.putInt(header.type);
 			buffer.putInt(header.size);
 			buffer.putInt(header.reserve);
 			buffer.putInt(header.crc);
+			
 			if (header.size > 0) {
-				int pos = octets.position();
-				buffer.put(octets.getBuffer());
-				octets.position(pos);
+				buffer.put(octets.getBuffer().array(), octets.position(), octets.remaining());
 			}
 			return true;
 		} catch (Exception e) {
@@ -294,7 +512,11 @@ public class HawkProtocol {
 			if (os.remaining() >= header.size) {
 				// 读协议数据
 				if (header.size > 0) {
-					octets = HawkOctetsStream.create(header.size);
+					if (octets == null) {
+						octets = HawkOctetsStream.create(header.size);
+					} else {
+						octets.clear().expand(header.size);
+					}
 					octets.pushBytes(os.popBytes(header.size));
 					octets.flip();
 					crc = octets.calcCrc();
@@ -348,7 +570,11 @@ public class HawkProtocol {
 			if (buffer.remaining() >= header.size) {
 				// 读协议数据
 				if (header.size > 0) {
-					octets = HawkOctetsStream.create(header.size);
+					if (octets == null) {
+						octets = HawkOctetsStream.create(header.size);
+					} else {
+						octets.clear().expand(header.size);
+					}
 					buffer.get(octets.getBuffer().array(), 0, header.size);
 					// 移动postion
 					octets.position(header.size);
@@ -377,18 +603,55 @@ public class HawkProtocol {
 	}
 
 	/**
+	 * 协议解包
+	 * 
+	 * @param jsonData
+	 * @return
+	 * @throws HawkException
+	 */
+	public boolean decodeFromJson(String jsonData) throws HawkException {
+		try {
+			JSONObject jsonObject = JSONObject.fromObject(jsonData);
+			if (!jsonObject.containsKey("type") || !jsonObject.containsKey("protocol")) {
+				return false;
+			}
+			
+			// 重置状态
+			header.clear();
+			header.type = jsonObject.getInt("type");
+			if (writeOctets(jsonObject.getString("protocol").getBytes())) {
+				if (jsonObject.containsKey("crc")) {
+					// crc校验
+					int crc = jsonObject.getInt("crc");
+					if (!checkCrc(crc)) {
+						throw new HawkException(String.format("protocol crc verify failed, type: %d", header.type));
+					}
+				}
+				return true;
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return false;
+	}
+	
+	/**
 	 * 写缓冲区
 	 * 
 	 * @param bytes
 	 * @return
 	 */
-	private boolean writeOctets(byte[] bytes) {
+	public boolean writeOctets(byte[] bytes) {
 		if (bytes == null) {
 			return true;
 		}
 
 		try {
-			octets = HawkOctetsStream.create(bytes, false);
+			if (octets == null) {
+				octets = HawkOctetsStream.create(bytes, false);
+			} else {
+				octets.clear().pushBytes(bytes).flip();
+			}
 			calcOctets();
 			return true;
 		} catch (Exception e) {
@@ -403,13 +666,17 @@ public class HawkProtocol {
 	 * @param buffer
 	 * @return
 	 */
-	private boolean writeOctets(ByteBuffer byteBuffer) {
+	public boolean writeOctets(ByteBuffer byteBuffer) {
 		if (byteBuffer == null) {
 			return true;
 		}
 
 		try {
-			octets = HawkOctetsStream.create(byteBuffer);
+			if (octets == null) {
+				octets = HawkOctetsStream.create(byteBuffer);
+			} else {
+				octets.clear().pushBuffer(byteBuffer).flip();
+			}
 			calcOctets();
 			return true;
 		} catch (Exception e) {
@@ -421,7 +688,7 @@ public class HawkProtocol {
 	/**
 	 * 计算协议信息
 	 */
-	private void calcOctets() {
+	public void calcOctets() {
 		if (octets != null) {
 			header.size = octets.remaining();
 			header.crc = octets.calcCrc();
@@ -434,7 +701,27 @@ public class HawkProtocol {
 	 * @param template
 	 * @return
 	 */
-	public <T> T parseProtocol(T template) {
-		return (T) HawkProtocolManager.getInstance().parseProtocol(this, template);
+	@SuppressWarnings("unchecked")
+	public <T extends GeneratedMessage> T parseProtocol(T template) {
+		if (parseObj == null) {
+			if (session != null && session.isJsonWebSession()) {
+				parseObj = HawkProtocolManager.getInstance().parseFromJson(this, template);
+			} else {
+				parseObj = HawkProtocolManager.getInstance().parseProtocol(this, template);
+			}
+		}
+		return (T) parseObj;
+	}
+	
+	/**
+	 * 解析协议
+	 * 
+	 * @return
+	 */
+	public HawkPacket parsePacket() {
+		if (parseObj == null) {
+			parseObj = HawkProtocolManager.getInstance().parsePacket(this);
+		}
+		return (HawkPacket) parseObj;
 	}
 }

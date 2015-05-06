@@ -1,0 +1,1 @@
+-A INPUT -p tcp -m tcp -m multiport --dports 6208,80,8080,5132,9000:9999 -j ACCEPT

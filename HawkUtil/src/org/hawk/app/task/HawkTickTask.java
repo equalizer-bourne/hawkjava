@@ -1,9 +1,7 @@
 package org.hawk.app.task;
 
-import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.hawk.app.HawkApp;
 import org.hawk.cache.HawkCacheObj;
@@ -18,48 +16,96 @@ import org.hawk.xid.HawkXID;
  */
 public class HawkTickTask extends HawkTask {
 	/**
+	 * 对象id
+	 */
+	HawkXID xid;
+	/**
 	 * 对象id列表
 	 */
 	List<HawkXID> xidList;
+
 	/**
-	 * 是否可锁定
+	 * 构造函数
+	 * 
 	 */
-	AtomicBoolean lockEnable;
+	protected HawkTickTask() {
+	}
+	
+	/**
+	 * 构造函数
+	 * 
+	 * @param xid
+	 */
+	protected HawkTickTask(HawkXID xid) {
+		setParam(xid);
+	}
 
 	/**
 	 * 构造函数
 	 * 
 	 * @param xid
 	 */
-	protected HawkTickTask() {
-		super(HawkTaskManager.TASK_TICK);
-
-		xidList = new LinkedList<HawkXID>();
-		lockEnable = new AtomicBoolean();
-		lockEnable.set(true);
+	protected HawkTickTask(List<HawkXID> xidList) {
+		setParam(xidList);
 	}
 
 	/**
-	 * 重设id列表
+	 * 设置任务参数
+	 * 
+	 * @param xid
+	 * @param msg
+	 */
+	public void setParam(HawkXID xid) {
+		this.xid = xid;
+	}
+
+	/**
+	 * 设置任务参数
 	 * 
 	 * @param xidList
+	 * @param msg
 	 */
-	public void resetXids(Collection<HawkXID> xidList) {
+	public void setParam(List<HawkXID> xidList) {
+		if (this.xidList == null) {
+			this.xidList = new LinkedList<HawkXID>();
+		}
 		this.xidList.clear();
+		this.xidList.addAll(xidList);
+	}
+	
+	/**
+	 * 缓存对象清理
+	 */
+	@Override
+	protected void clear() {
+		xid = null;
 		if (xidList != null) {
-			// 拷贝参数大小
-			for (HawkXID xid : xidList) {
-				this.xidList.add(xid);
-			}
+			xidList.clear();
 		}
 	}
 
+	/**
+	 * 对象克隆
+	 */
+	@Override
+	protected HawkCacheObj clone() {
+		return new HawkTickTask();
+	}
+	
 	/**
 	 * 执行tick任务
 	 */
 	@Override
 	protected int run() {
-		for (HawkXID xid : xidList) {
+		if (xidList != null && xidList.size() > 0) {
+			for (HawkXID xid : xidList) {
+				try {
+					HawkApp.getInstance().dispatchTick(xid);
+				} catch (Exception e) {
+					HawkException.catchException(e);
+				}
+			}
+		} else {
 			try {
 				HawkApp.getInstance().dispatchTick(xid);
 			} catch (Exception e) {
@@ -70,45 +116,24 @@ public class HawkTickTask extends HawkTask {
 	}
 
 	/**
-	 * 锁定
+	 * 构建对象
 	 * 
+	 * @param xidList
 	 * @return
 	 */
-	public boolean lock() {
-		return lockEnable.compareAndSet(true, false);
+	public static HawkTickTask valueOf(HawkXID xid) {
+		HawkTickTask task = new HawkTickTask(xid);
+		return task;
 	}
 
 	/**
-	 * 解锁
+	 * 构建对象
 	 * 
+	 * @param xidList
 	 * @return
 	 */
-	public boolean unlock() {
-		return lockEnable.compareAndSet(false, true);
-	}
-
-	/**
-	 * 清理重置任务
-	 */
-	@Override
-	protected boolean clear() {
-		if (xidList != null) {
-			xidList.clear();
-		}
-
-		// 缓存线程任务
-		HawkTaskManager.getInstance().releaseTask(this);
-
-		// 解除锁定
-		unlock();
-		return super.clear();
-	}
-
-	/**
-	 * 克隆创建对象
-	 */
-	@Override
-	protected HawkCacheObj clone() {
-		return new HawkTickTask();
+	public static HawkTickTask valueOf(List<HawkXID> xidList) {
+		HawkTickTask task = new HawkTickTask(xidList);
+		return task;
 	}
 }

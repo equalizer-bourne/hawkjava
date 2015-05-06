@@ -4,14 +4,20 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.HashMap;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.hawk.app.HawkApp;
 import org.hawk.log.HawkLog;
+import org.hawk.nativeapi.HawkNativeApi;
 import org.hawk.os.HawkException;
+import org.hawk.os.HawkTime;
 
 /**
  * 配置文件管理器
@@ -89,9 +95,13 @@ public class HawkConfigManager {
 	 */
 	private ConcurrentHashMap<Class<?>, HawkConfigStorage> storages = new ConcurrentHashMap<Class<?>, HawkConfigStorage>();
 	/**
-	 * 存储更新配置对象
+	 * 存储备份配置对象
 	 */
-	private Map<Class<?>, HawkConfigStorage> updateStorages = new HashMap<Class<?>, HawkConfigStorage>();
+	private Map<Class<?>, HawkConfigStorage> backupStorages = new ConcurrentHashMap<Class<?>, HawkConfigStorage>();
+	/**
+	 * 自动清理static容器数据
+	 */
+	private boolean autoClearStaticData = true;
 	/**
 	 * 配置管理器实例
 	 */
@@ -117,6 +127,11 @@ public class HawkConfigManager {
 	 * @throws Exception
 	 */
 	public boolean init(String configPackages) {
+		// 检测
+		if (!HawkNativeApi.checkHawk()) {
+			return false;
+		}
+		
 		try {
 			String[] configPackageArray = configPackages.split(",");
 			if (configPackageArray != null) {
@@ -130,6 +145,12 @@ public class HawkConfigManager {
 					}
 				}
 			}
+			
+			// 最终校验配置文件数据
+			if (!checkConfigData()) {
+				return false;
+			}
+			
 			return true;
 		} catch (Exception e) {
 			HawkException.catchException(e);
@@ -138,20 +159,107 @@ public class HawkConfigManager {
 	}
 
 	/**
-	 * 更新加载
+	 * 自动清理静态数据
+	 * 
+	 * @param auto
 	 */
-	public void updateReload() {
-		updateStorages.clear();
-		for (Entry<Class<?>, HawkConfigStorage> entry : storages.entrySet()) {
-			if (entry.getValue().checkUpdate()) {
-				try {
-					updateStorages.put(entry.getKey(), new HawkConfigStorage(entry.getKey()));
-				} catch (Exception e) {
-					HawkException.catchException(e);
-				}
+	public void autoClearStaticData(boolean auto) {
+		this.autoClearStaticData = auto;
+	}
+	
+	/**
+	 * 检测配置数据
+	 * @return
+	 */
+	private boolean checkConfigData() {
+		for (Map.Entry<Class<?>, HawkConfigStorage> entry : storages.entrySet()) {
+			HawkConfigStorage storage = entry.getValue();
+			if (!storage.checkValid()) {
+				HawkLog.errPrintln("config check valid failed: " + entry.getKey().getName());
+				return false;
 			}
 		}
-		storages.putAll(updateStorages);
+		return HawkApp.getInstance().checkConfigData();
+	}
+	
+	/**
+	 * 清理静态数据
+	 * 
+	 * @param configClass
+	 * @return
+	 */
+	private boolean clearConfigStaticData(Class<?> configClass) {
+		try {
+			if (autoClearStaticData) {
+				for (Field field : configClass.getDeclaredFields()) {
+					if (!Modifier.isStatic(field.getModifiers())) {
+						continue;
+					}
+					
+					for (Method method : field.getType().getDeclaredMethods()) {
+						if (method.getName().equals("clear")) {
+							try {
+								field.setAccessible(true);
+								method.invoke(field.get(null));
+							} catch (Exception e) {
+								HawkException.catchException(e);
+							}
+						}
+					}
+				}
+			}
+			return true;
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return false;
+	}
+	
+	/**
+	 * 更新加载
+	 */
+	public boolean updateReload() {
+		backupStorages.clear();
+		backupStorages.putAll(storages);
+		List<HawkConfigStorage> needCheckList = new LinkedList<>();
+		try {
+			for (Entry<Class<?>, HawkConfigStorage> entry : backupStorages.entrySet()) {
+				if (entry.getValue().checkUpdate()) {
+					HawkLog.logPrintln("check config update: " + entry.getValue().getFilePath());
+					// 清理静态数据
+					if (!clearConfigStaticData(entry.getKey())) {
+						continue;
+					}
+					
+					// 加载新配置信息
+					HawkConfigStorage configStorage = new HawkConfigStorage(entry.getKey());
+					storages.put(entry.getKey(), configStorage);
+					// 添加待检测列表
+					needCheckList.add(configStorage);
+				}
+			}
+		} catch (Exception e) {
+			// 出现异常即恢复备份对象库
+			storages.clear();
+			storages.putAll(backupStorages);
+			// 打印异常
+			HawkException.catchException(e);
+			return false;
+		}
+		
+		for(HawkConfigStorage storage : needCheckList) {
+			// 校验失败即恢复备份配置信息
+			if (!storage.checkValid()) {
+				storages.clear();
+				storages.putAll(backupStorages);
+				HawkLog.errPrintln("storage check failed: " + storage.getFilePath());
+				return false;
+			}
+			HawkLog.logPrintln("update config success: " + storage.getFilePath());
+		}
+		
+		HawkLog.logPrintln("check config finish: " + HawkTime.getTimeString());
+		return true;
 	}
 
 	/**

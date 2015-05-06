@@ -23,7 +23,7 @@ public class HawkConstable {
 	 * @param constLock
 	 */
 	public HawkConstable(boolean constLock) {
-		constLock = this.constLock;
+		this.constLock = constLock;
 	}
 
 	/**

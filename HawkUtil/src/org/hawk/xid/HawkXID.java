@@ -1,14 +1,12 @@
 package org.hawk.xid;
 
-import org.hawk.cache.HawkCacheObj;
-
 /**
  * 对象唯一ID
  * 
  * @author hawk
  * 
  */
-public class HawkXID extends HawkCacheObj implements Comparable<HawkXID> {
+public class HawkXID implements Comparable<HawkXID>, Cloneable {
 	/**
 	 * 静态常量
 	 */
@@ -160,7 +158,6 @@ public class HawkXID extends HawkCacheObj implements Comparable<HawkXID> {
 	/**
 	 * 清理数据
 	 */
-	@Override
 	public boolean clear() {
 		type = 0;
 		id = 0;
@@ -171,7 +168,7 @@ public class HawkXID extends HawkCacheObj implements Comparable<HawkXID> {
 	 * 对象克隆
 	 */
 	@Override
-	public HawkCacheObj clone() {
+	public HawkXID clone() {
 		return new HawkXID(type, id);
 	}
 

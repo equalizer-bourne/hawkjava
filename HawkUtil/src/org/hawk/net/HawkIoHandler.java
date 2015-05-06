@@ -1,11 +1,12 @@
 package org.hawk.net;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.mina.core.service.IoHandlerAdapter;
 import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
+import org.hawk.app.HawkApp;
 import org.hawk.log.HawkLog;
+import org.hawk.net.protocol.HawkProtocol;
+import org.hawk.os.HawkException;
 
 /**
  * mina对应的io处理句柄
@@ -13,11 +14,6 @@ import org.hawk.log.HawkLog;
  * @author hawk
  */
 public class HawkIoHandler extends IoHandlerAdapter {
-	/**
-	 * 活跃会话数
-	 */
-	AtomicInteger activeSession = new AtomicInteger();
-
 	/**
 	 * ip用途定义
 	 * 
@@ -60,7 +56,7 @@ public class HawkIoHandler extends IoHandlerAdapter {
 	 * @param usage
 	 */
 	public void setIpUsage(int ipUsage) {
-		ipUsage = this.ipUsage;
+		this.ipUsage = ipUsage;
 	}
 
 	/**
@@ -68,18 +64,19 @@ public class HawkIoHandler extends IoHandlerAdapter {
 	 */
 	@Override
 	public void sessionCreated(IoSession session) {
-	}
-
-	/**
-	 * 开启回调
-	 */
-	@Override
-	public void sessionOpened(IoSession session) throws Exception {
+		HawkNetStatistics.getInstance().onSessionCreated();
+		// 获取ip信息
+		String ipaddr = "0.0.0.0";
+		try {
+			ipaddr = session.getRemoteAddress().toString().split(":")[0].substring(1);
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		
 		// 白名单校验
 		if ((ipUsage & IpUsage.WHITE_IPTABLES) != 0) {
-			String ip = session.getRemoteAddress().toString().split(":")[0].substring(1);
-			if (!HawkNetManager.getInstance().checkWhiteIptables(ip)) {
-				HawkLog.logPrintln(String.format("session closed by white iptables, ipaddr: %s", ip));
+			if (!HawkNetManager.getInstance().checkWhiteIptables(ipaddr)) {
+				HawkLog.logPrintln(String.format("session closed by white iptables, ipaddr: %s", ipaddr));
 				session.close(false);
 				return;
 			}
@@ -87,35 +84,44 @@ public class HawkIoHandler extends IoHandlerAdapter {
 
 		// 黑名单校验
 		if ((ipUsage & IpUsage.BLACK_IPTABLES) != 0) {
-			String ip = session.getRemoteAddress().toString().split(":")[0].substring(1);
-			if (HawkNetManager.getInstance().checkBlackIptables(ip)) {
-				HawkLog.logPrintln(String.format("session closed by black iptables, ipaddr: %s", ip));
+			if (HawkNetManager.getInstance().checkBlackIptables(ipaddr)) {
+				HawkLog.logPrintln(String.format("session closed by black iptables, ipaddr: %s", ipaddr));
 				session.close(false);
 				return;
 			}
 		}
 
 		try {
-			HawkSession peerSession = new HawkSession();
-			if (peerSession != null) {
-				if (!peerSession.onOpened(session)) {
+			HawkSession hawkSession = new HawkSession();
+			if (hawkSession != null) {
+				if (!hawkSession.onOpened(session)) {
 					session.close(false);
 					return;
 				}
 
-				// 最大协议数控制
-				if (HawkNetManager.getInstance().getSessionMaxSize() > 0 && activeSession.get() >= HawkNetManager.getInstance().getSessionMaxSize()) {
-					session.close(false);
-					return;
+				// 最大会话数控制
+				if (HawkNetManager.getInstance().getSessionMaxSize() > 0) {
+					int curSession = HawkNetStatistics.getInstance().getCurSession();
+					if (curSession >= HawkNetManager.getInstance().getSessionMaxSize()) {
+						HawkLog.errPrintln(String.format("session maxsize limit, ipaddr: %s, total: %d", ipaddr, curSession));
+						session.close(false);
+						return;
+					}
 				}
 
-				activeSession.incrementAndGet();
-
-				String ipaddr = session.getRemoteAddress().toString().split(":")[0].substring(1);
-				HawkLog.debugPrintln(String.format("session opened, ipaddr: %s, total: %d", ipaddr, activeSession.get()));
+				if (HawkApp.getInstance().getAppCfg().isDebug()) {
+					HawkLog.logPrintln(String.format("session opened, ipaddr: %s, total: %d", ipaddr, HawkNetStatistics.getInstance().getCurSession()));
+				}
 			}
 		} catch (Exception e) {
 		}
+	}
+
+	/**
+	 * 开启回调
+	 */
+	@Override
+	public void sessionOpened(IoSession session) throws Exception {
 	}
 
 	/**
@@ -124,9 +130,19 @@ public class HawkIoHandler extends IoHandlerAdapter {
 	@Override
 	public void messageReceived(IoSession session, Object message) throws Exception {
 		try {
-			HawkSession peerSession = (HawkSession) session.getAttribute(HawkSession.SESSION_ATTR);
-			if (peerSession != null) {
-				peerSession.onReceived(message);
+			HawkSession hawkSession = (HawkSession) session.getAttribute(HawkSession.SESSION_ATTR);
+			if (hawkSession != null) {
+				// 系统协议提前处理
+				if (message instanceof HawkProtocol) {
+					HawkProtocol protocol = (HawkProtocol) message;
+					if (HawkNetManager.getInstance().onSysProtocol(protocol)) {
+						return;
+					}
+				}
+				
+				hawkSession.onReceived(message);
+				// 通知接收到协议对象
+				HawkNetStatistics.getInstance().onRecvProto();
 			}
 		} catch (Exception e) {
 		}
@@ -137,6 +153,8 @@ public class HawkIoHandler extends IoHandlerAdapter {
 	 */
 	@Override
 	public void messageSent(IoSession session, Object message) {
+		// 通知已发送协议对象
+		HawkNetStatistics.getInstance().onSendProto();
 	}
 
 	/**
@@ -145,9 +163,9 @@ public class HawkIoHandler extends IoHandlerAdapter {
 	@Override
 	public void sessionIdle(IoSession session, IdleStatus status) throws Exception {
 		try {
-			HawkSession peerSession = (HawkSession) session.getAttribute(HawkSession.SESSION_ATTR);
-			if (peerSession != null) {
-				peerSession.onIdle(status);
+			HawkSession hawkSession = (HawkSession) session.getAttribute(HawkSession.SESSION_ATTR);
+			if (hawkSession != null) {
+				hawkSession.onIdle(status);
 			}
 		} catch (Exception e) {
 		}
@@ -169,15 +187,17 @@ public class HawkIoHandler extends IoHandlerAdapter {
 	 */
 	@Override
 	public void sessionClosed(IoSession session) throws Exception {
-		activeSession.decrementAndGet();
-
-		String ipaddr = session.getRemoteAddress().toString().split(":")[0].substring(1);
-		HawkLog.debugPrintln(String.format("session closed, ipaddr: %s, total: %d", ipaddr, activeSession.get()));
-
+		HawkNetStatistics.getInstance().onSessionClosed();
+		
+		if (HawkApp.getInstance().getAppCfg().isDebug()) {
+			String ipaddr = session.getRemoteAddress().toString().split(":")[0].substring(1);
+			HawkLog.logPrintln(String.format("session closed, ipaddr: %s, total: %d", ipaddr, HawkNetStatistics.getInstance().getCurSession()));
+		}
+		
 		try {
-			HawkSession peerSession = (HawkSession) session.getAttribute(HawkSession.SESSION_ATTR);
-			if (peerSession != null) {
-				peerSession.onClosed();
+			HawkSession hawkSession = (HawkSession) session.getAttribute(HawkSession.SESSION_ATTR);
+			if (hawkSession != null) {
+				hawkSession.onClosed();
 			}
 		} catch (Exception e) {
 		}

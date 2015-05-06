@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.hawk.nativeapi.HawkNativeApi;
+import org.hawk.os.HawkException;
+
 /**
  * 线程池封装
  * 
@@ -12,38 +15,38 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class HawkThreadPool {
 	/**
-	 * 线程队列
-	 */
-	List<HawkThread> threadList;
-	/**
 	 * 线程数目
 	 */
-	int threadNum;
+	protected int threadNum;
 	/**
 	 * 池名称
 	 */
-	String poolName;
+	protected String poolName;
+	/**
+	 * 线程队列
+	 */
+	protected List<HawkThread> threadList;
 	/**
 	 * 运行中
 	 */
-	volatile boolean running;
+	protected volatile boolean running;
 	/**
 	 * 等待退出循环
 	 */
-	volatile boolean waitBreak;
+	protected volatile boolean waitBreak;
 	/**
 	 * 当前轮换索引
 	 */
-	AtomicLong turnIndex;
+	protected AtomicLong turnIndex;
 
 	/**
 	 * 线程池构造
 	 */
 	public HawkThreadPool(String poolName) {
-		running = false;
-		waitBreak = false;		
-		turnIndex = new AtomicLong(0);
-		threadList = new ArrayList<HawkThread>();
+		this.running = false;
+		this.waitBreak = false;		
+		this.turnIndex = new AtomicLong(0);
+		this.threadList = new ArrayList<HawkThread>();
 		this.poolName = poolName;
 	}
 
@@ -54,6 +57,11 @@ public class HawkThreadPool {
 	 * @return
 	 */
 	public boolean initPool(int poolSize) {
+		// 检测
+		if (!HawkNativeApi.checkHawk()) {
+			return false;
+		}
+		
 		threadNum = poolSize;
 		for (int i = 0; i < threadNum; i++) {
 			HawkThread thread = new HawkThread();
@@ -150,7 +158,11 @@ public class HawkThreadPool {
 
 			// 各个线程退出
 			for (int i = 0; i < threadNum; i++) {
-				threadList.get(i).close(waitBreak);
+				try {
+					threadList.get(i).close(waitBreak);
+				} catch (Exception e) {
+					HawkException.catchException(e);
+				}
 			}
 
 			// 设置标记

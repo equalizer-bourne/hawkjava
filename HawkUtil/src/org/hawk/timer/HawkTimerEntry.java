@@ -1,6 +1,5 @@
 package org.hawk.timer;
 
-import java.io.Serializable;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Arrays;
@@ -13,12 +12,7 @@ import org.hawk.os.HawkTime;
  * 
  * @change xulinqs
  */
-public class HawkTimerEntry implements Comparable<HawkTimerEntry>, Serializable {
-	/**
-	 * 序列版本号
-	 */
-	private static final long serialVersionUID = 4869856098341291918L;
-
+public class HawkTimerEntry implements Comparable<HawkTimerEntry> {
 	/**
 	 * 时间配置, 秒
 	 */
@@ -139,8 +133,8 @@ public class HawkTimerEntry implements Comparable<HawkTimerEntry>, Serializable 
 	 */
 	private void setName(String name) {
 		this.name = name;
-		if (name == null || name.length() <= 0)
-			name = "Alarm" + (UNIQUE++);
+		if (this.name == null || this.name.length() <= 0)
+			this.name = "Alarm" + (UNIQUE++);
 	}
 
 	/**

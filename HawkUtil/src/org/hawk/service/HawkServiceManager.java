@@ -10,6 +10,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
@@ -21,6 +22,7 @@ import java.util.zip.ZipFile;
 import org.hawk.app.HawkApp;
 import org.hawk.cryption.HawkMd5;
 import org.hawk.log.HawkLog;
+import org.hawk.nativeapi.HawkNativeApi;
 import org.hawk.os.HawkException;
 
 /**
@@ -60,12 +62,23 @@ public class HawkServiceManager {
 	}
 	
 	/**
+	 * 否则函数
+	 */
+	public HawkServiceManager() {
+	}
+	
+	/**
 	 * 初始化
 	 * 
 	 * @param serviceJarFile
 	 * @return
 	 */
 	public boolean init(String serviceJarFile) {
+		// 检测
+		if (!HawkNativeApi.checkHawk()) {
+			return false;
+		}
+		
 		if (serviceJarFile == null) {
 			HawkLog.errPrintln("service manager init failed");
 			return false;
@@ -78,20 +91,11 @@ public class HawkServiceManager {
 			return false;
 		}
 
-		try {
-			String url = null;
-			if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-				url = "file:/" + getClassFilePath();
-			} else {
-				url = "file:" + getClassFilePath();
-			}
-			serviceClassLoader = new URLClassLoader(new URL[] { new URL(url) });
-		} catch (MalformedURLException e) {
-			HawkException.catchException(e);
+		
+		// 更新
+		if (!update()) {
 			return false;
 		}
-
-		update();
 		return true;
 	}
 
@@ -113,26 +117,38 @@ public class HawkServiceManager {
 	public HawkService getService(String service) {
 		return serveiceInstances.get(service);
 	}
+	
+	/**
+	 * 获取所有的service对象
+	 * @return
+	 */
+	public Collection<HawkService> getServices() {
+		return serveiceInstances.values();
+	}
 
 	/**
 	 * 更新jar
 	 */
-	public void update() {
+	public boolean update() {
+		try {
+			String url = null;
+			if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+				url = "file:/" + getClassFilePath();
+			} else {
+				url = "file:" + getClassFilePath();
+			}
+			serviceClassLoader = new URLClassLoader(new URL[] { new URL(url) });
+		} catch (MalformedURLException e) {
+			HawkException.catchException(e);
+			return false;
+		}
+		
 		List<ClassBlock> blockList = loadJarClassBlock(serviceJarFile);
 		// 判断哪些文件需要替换加载
 		for (ClassBlock block : blockList) {
-			boolean isChange = false;
-			File targetFile = new File(block.getFilePath());
-			if (!targetFile.exists()) {
-				block.writeToFile();
-				isChange = true;
-			} else if (!block.isMd5Changed()) {
-				block.writeToFile();
-				isChange = true;
-			}
-
+			block.writeToFile();
 			// 需要重新加载 $表示内部类
-			if (isChange && block.getFilePath().indexOf("$") < 0) {
+			if (block.getFilePath().indexOf("$") < 0) {
 				String className = block.getFilePath().replace(getClassFilePath(), "").replaceAll("/", ".").replaceAll("\\\\", ".").replace(".class", "");
 				try {
 					Class<?> clazz = serviceClassLoader.loadClass(className);
@@ -143,16 +159,18 @@ public class HawkServiceManager {
 							String name = service.getName();
 							if (name != null && name.length() > 0) {
 								serveiceInstances.put(name, service);
-								HawkLog.logPrintln(String.format("service update class: %s success", className));
+								HawkLog.logPrintln(String.format("service update class: %s success,instance: %s", className,service.toString()));
 							}
 						}
 					}
 				} catch (Exception e) {
 					HawkException.catchException(e);
 					HawkLog.errPrintln(String.format("service load class: %s failed", className));
+					return false;
 				}
 			}
 		}
+		return true;
 	}
 
 	/**
@@ -260,8 +278,9 @@ public class HawkServiceManager {
 		 * 
 		 * @return
 		 */
+		@SuppressWarnings("unused")
 		protected boolean isMd5Changed() {
-			return md5sum.equals(HawkMd5.makeMD5(new File(filePath)));
+			return !md5sum.equals(HawkMd5.makeMD5(new File(filePath)));
 		}
 
 		/**

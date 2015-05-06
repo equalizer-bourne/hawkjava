@@ -13,7 +13,21 @@ public abstract class HawkTask extends HawkCacheObj {
 	 * 任务类型
 	 */
 	private int taskType;
-
+	/**
+	 * 必须被执行(退出时会检测)
+	 */
+	private boolean mustRun;
+	
+	/**
+	 * 构造函数
+	 * 
+	 * @param taskType
+	 */
+	public HawkTask() {
+		this.taskType = 0;
+		this.mustRun = false;
+	}
+	
 	/**
 	 * 构造函数
 	 * 
@@ -21,8 +35,19 @@ public abstract class HawkTask extends HawkCacheObj {
 	 */
 	public HawkTask(int taskType) {
 		this.taskType = taskType;
+		this.mustRun = false;
 	}
 
+	/**
+	 * 构造函数
+	 * 
+	 * @param mustRun
+	 */
+	public HawkTask(boolean mustRun) {
+		this.taskType = 0;
+		this.mustRun = mustRun;
+	}
+	
 	/**
 	 * 获取任务类型
 	 * 
@@ -42,19 +67,41 @@ public abstract class HawkTask extends HawkCacheObj {
 	}
 
 	/**
+	 * 设置必须被执行
+	 * 
+	 * @param mustRun
+	 */
+	public void setMustRun(boolean mustRun) {
+		this.mustRun = mustRun;
+	}
+	
+	/**
+	 * 是否必须被执行
+	 * 
+	 * @return
+	 */
+	public boolean isMustRun() {
+		return mustRun;
+	}
+	
+	/**
+	 * 任务清理
+	 */
+	protected void clear() {
+	}
+	
+	/**
+	 * 任务克隆
+	 */
+	@Override
+	protected HawkCacheObj clone() {
+		return null;
+	}
+	
+	/**
 	 * 线程调用的任务执行函数
 	 * 
 	 * @return
 	 */
 	protected abstract int run();
-
-	/**
-	 * 执行完之后的清理函数
-	 * 
-	 * @return
-	 */
-	@Override
-	protected boolean clear() {
-		return false;
-	}
 }

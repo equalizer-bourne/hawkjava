@@ -17,6 +17,20 @@ import org.hawk.os.HawkOSOperator;
  */
 public class HawkMd5 {
 	/**
+	 * 转换md5的字节流到十六进制字符串
+	 * @param data
+	 * @return
+	 */
+	private static String bytesToHexString(byte[] data) {		
+		StringBuilder builder = new StringBuilder(data.length * 4);
+		for (int i = 0; i < data.length; i++) {
+			builder.append(HawkOSOperator.HEX_DIGITS[data[i] >>> 4 & 0xF]);
+			builder.append(HawkOSOperator.HEX_DIGITS[data[i] & 0xF]);
+		}
+		return builder.toString();
+	}
+	
+	/**
 	 * 返回32位MD5字符串
 	 * @param bytes
 	 * @return
@@ -26,7 +40,7 @@ public class HawkMd5 {
 			MessageDigest messageDigest = MessageDigest.getInstance("MD5");			
 			messageDigest.update(bytes);
 			byte[] md5Bytes = messageDigest.digest();
-			return HawkOSOperator.bytesToHexString(md5Bytes);
+			return bytesToHexString(md5Bytes);
 		} catch (NoSuchAlgorithmException e) {
 			HawkException.catchException(e);
 		}
@@ -45,7 +59,7 @@ public class HawkMd5 {
 			MessageDigest messageDigest = MessageDigest.getInstance("MD5");			
 			messageDigest.update(bytes, offset, size);
 			byte[] md5Bytes = messageDigest.digest();
-			return HawkOSOperator.bytesToHexString(md5Bytes);
+			return bytesToHexString(md5Bytes);
 		} catch (NoSuchAlgorithmException e) {
 			HawkException.catchException(e);
 		}
@@ -83,7 +97,7 @@ public class HawkMd5 {
 					messageDigest.update(data, 0, count);
 				}
 				byte[] md5Bytes = messageDigest.digest();
-				return HawkOSOperator.bytesToHexString(md5Bytes);
+				return bytesToHexString(md5Bytes);
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			} finally {

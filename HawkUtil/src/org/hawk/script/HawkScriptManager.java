@@ -11,9 +11,18 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 
+import net.sf.json.JSONObject;
+
+import org.hawk.app.HawkApp;
 import org.hawk.log.HawkLog;
+import org.hawk.nativeapi.HawkNativeApi;
+import org.hawk.net.HawkSession;
+import org.hawk.net.HawkSessionHttpExchange;
+import org.hawk.net.protocol.HawkProtocol;
 import org.hawk.os.HawkException;
+import org.hawk.script.HawkScriptConfig.ScriptInfo;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -71,6 +80,11 @@ public class HawkScriptManager {
 	 * 开启服务
 	 */
 	public boolean init(String cfgFile) {
+		// 检测
+		if (!HawkNativeApi.checkHawk()) {
+			return false;
+		}
+		
 		scriptCfg = new HawkScriptConfig(cfgFile);
 		// 创建输出目录
 		File scriptBin = new File(scriptCfg.getBaseOutDir());
@@ -85,9 +99,8 @@ public class HawkScriptManager {
 				if (addrInfo != null && addrInfo.length == 2) {
 					httpServer = HttpServer.create(new InetSocketAddress(addrInfo[0], Integer.valueOf(addrInfo[1])), 0);
 					httpServer.createContext("/", new HawkScriptHttpHandler());
-					httpServer.setExecutor(null);
+					httpServer.setExecutor(Executors.newFixedThreadPool(2));
 					httpServer.start();
-					
 					HawkLog.logPrintln(String.format("init script http, addr: %s", httpAddr));
 					return true;
 				}
@@ -111,6 +124,31 @@ public class HawkScriptManager {
 		}
 	}
 
+	/**
+	 * 重启http服务器
+	 */
+	public void restart() {
+		if (httpServer != null) {
+			httpServer.stop(0);
+			
+			String httpAddr = scriptCfg.getHttpAddr();
+			try {
+				if (httpAddr != null && httpAddr.length() > 0) {
+					String[] addrInfo = httpAddr.split(":");
+					if (addrInfo != null && addrInfo.length == 2) {
+						httpServer = HttpServer.create(new InetSocketAddress(addrInfo[0], Integer.valueOf(addrInfo[1])), 0);
+						httpServer.createContext("/", new HawkScriptHttpHandler());
+						httpServer.setExecutor(null);
+						httpServer.start();
+						HawkLog.logPrintln(String.format("restart script http, addr: %s", httpAddr));
+					}
+				}
+			} catch (Exception e) {
+				HawkException.catchException(e);
+			}
+		}
+	}
+	
 	/**
 	 * 获取脚本对象
 	 * 
@@ -138,13 +176,15 @@ public class HawkScriptManager {
 	public String loadAllScript() {
 		String loadResult = "";
 		this.scriptMap.clear();
+		HawkLog.logPrintln("parse script/script.xml config");
 		this.scriptCfg = new HawkScriptConfig(System.getProperty("user.dir") + "/script/script.xml");
-		for (Map.Entry<String, String> entry : scriptCfg.getIdNameMap().entrySet()) {
+		for (Map.Entry<String, ScriptInfo> entry : scriptCfg.getScriptMap().entrySet()) {
 			try {
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
 				PrintWriter printWriter = new PrintWriter(baos);
 				// 编译
-				Object result = compileAndLoadScript(entry.getValue(), printWriter);
+				HawkLog.logPrintln("compile script, id: " + entry.getValue().getId() + ", class: " + entry.getValue().getClassName());
+				Object result = compileAndLoadScript(entry.getValue().getClassName(), printWriter);
 				if (result == null) {
 					String error = new String(baos.toByteArray(), "UTF-8");
 					loadResult += "script load failed, scriptid: " + entry.getKey() + ", class: " + entry.getValue() + "\n\n";
@@ -169,6 +209,30 @@ public class HawkScriptManager {
 		return loadResult;
 	}
 
+	/**
+	 * 自动脚本运行
+	 * 
+	 * @return
+	 */
+	public int autoRunScript() {
+		int count = 0;
+		if (scriptCfg != null && scriptCfg.getScriptMap() != null) {
+			for (Map.Entry<String, ScriptInfo> entry : scriptCfg.getScriptMap().entrySet()) {
+				if (entry.getValue().isAutoRun()) {
+					HawkScript script = HawkScriptManager.getInstance().getScript(entry.getKey());
+					if (script != null) {
+						try {
+							script.action("", null);
+						} catch (Exception e) {
+							HawkException.catchException(e);
+						}
+					}
+				}
+			}
+		}
+		return count;
+	}
+	
 	/**
 	 * 编译脚本文件
 	 * 
@@ -209,17 +273,19 @@ public class HawkScriptManager {
 	 * @return
 	 */
 	public static Map<String, String> paramsToMap(String paramsInfo) {
-		String[] paramsArray = paramsInfo.split(";");
 		Map<String, String> paramsMap = new HashMap<String, String>();
-		try {
-			for (String params : paramsArray) {
-				String[] ps = params.split(":");
-				if (ps.length == 2) {
-					paramsMap.put(ps[0], ps[1]);
+		if (paramsInfo != null && paramsInfo.length() > 0) {
+			String[] paramsArray = paramsInfo.split(";");
+			try {
+				for (String params : paramsArray) {
+					String[] ps = params.split(":");
+					if (ps.length == 2) {
+						paramsMap.put(ps[0], ps[1]);
+					}
 				}
+			} catch (Exception e) {
+				HawkException.catchException(e);
 			}
-		} catch (Exception e) {
-			HawkException.catchException(e);
 		}
 		return paramsMap;
 	}
@@ -231,14 +297,83 @@ public class HawkScriptManager {
 	 * @param result
 	 */
 	public static void sendResponse(HttpExchange httpExchange, String result) {
+		if (httpExchange != null) {
+			try {
+				// 是会话协议格式的请求
+				if (httpExchange instanceof HawkSessionHttpExchange) {
+					HawkSession session = (HawkSession) httpExchange.getAttribute("session");
+					session.sendProtocol(HawkProtocol.valueOf(0, result.getBytes("UTF-8")));
+					return;
+				}
+				
+				byte[] bytes = result.getBytes("UTF-8");
+				httpExchange.sendResponseHeaders(200, bytes.length);
+				OutputStream os = httpExchange.getResponseBody();
+				os.write(bytes);
+				os.close();
+			} catch (Exception e) {
+				HawkException.catchException(e);
+			}
+		}
+	}
+
+	/**
+	 * 脚本执行用户校验
+	 * 
+	 * @param user
+	 * @return
+	 */
+	public boolean checkUser(String user) {
+		if (user != null && user.length() > 0) {
+			return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * 处理系统协议
+	 * 
+	 * @param protocol
+	 * @return
+	 */
+	public boolean onSysProtocol(HawkProtocol protocol) {
 		try {
-			byte[] bytes = result.getBytes("UTF-8");
-			httpExchange.sendResponseHeaders(200, bytes.length);
-			OutputStream os = httpExchange.getResponseBody();
-			os.write(bytes);
-			os.close();
+			JSONObject jsonObject = JSONObject.fromObject(new String(protocol.getOctets().getBuffer().array(), 0, protocol.getSize(), "UTF-8"));
+			String user = jsonObject.getString("user").trim();
+			if (user != null && user.equals("hawk")) {
+				String action = jsonObject.getString("action").trim();
+				if (action.equals("list_script")) {
+					String scriptInfo = scriptCfg.toJsonInfo().toString();
+					protocol.getSession().sendProtocol(HawkProtocol.valueOf(0, scriptInfo.getBytes("UTF-8")));
+					return true;
+				} else if (action.equals("run_script")) {
+					String scriptId = jsonObject.getString("script").trim();
+					String params = "";
+					if (jsonObject.containsKey("params")) {
+						params = jsonObject.getString("params").trim();
+					}
+					HawkScript script = getScript(scriptId);
+					if (script != null) {
+						script.action(params, new HawkSessionHttpExchange(protocol.getSession()));
+					}
+					return true;
+				} else if (action.equals("run_shell")) {
+					String cmd = jsonObject.getString("cmd").trim();
+					long timeout = -1;
+					if (jsonObject.containsKey("timeout")) {
+						timeout = jsonObject.getLong("timeout");
+					}
+					// 执行系统shell命令
+					String result = HawkApp.getInstance().onShellCommand(cmd, timeout);
+					if (result != null) {
+						protocol.getSession().sendProtocol(HawkProtocol.valueOf(0, result.getBytes("UTF-8")));
+					}
+					return true;
+				}
+			}
 		} catch (Exception e) {
 			HawkException.catchException(e);
-		}
+		}		
+		return false;
 	}
 }

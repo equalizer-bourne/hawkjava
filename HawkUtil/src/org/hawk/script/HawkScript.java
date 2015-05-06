@@ -7,15 +7,17 @@ import com.sun.net.httpserver.HttpExchange;
  * 
  * @author hawk
  */
-public interface HawkScript {
+public abstract class HawkScript {
 	/**
 	 * 日志记录
 	 * 
 	 * @param user
 	 * @param params
 	 */
-	public void logger(String user, String params);
-
+	public void logger(String user, String params) {
+		
+	}
+	
 	/**
 	 * 响应行为
 	 * 
@@ -23,5 +25,5 @@ public interface HawkScript {
 	 * @param httpExchange
 	 * @return
 	 */
-	public String action(String params, HttpExchange httpExchange);
+	public abstract void action(String params, HttpExchange httpExchange);
 }

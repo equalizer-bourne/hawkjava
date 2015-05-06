@@ -2,9 +2,9 @@ package org.hawk.util;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
+
 import org.hawk.os.HawkException;
 
 /**
@@ -30,9 +30,21 @@ public class HawkZlib {
 	 * @return
 	 */
 	public static byte[] zlibDeflate(byte[] inputData) {
+		return zlibDeflate(inputData, 0, inputData.length);
+	}
+
+	/**
+	 * zlib压缩
+	 * 
+	 * @param inputData
+	 * @param offset
+	 * @param length
+	 * @return
+	 */
+	public static byte[] zlibDeflate(byte[] inputData, int offset, int length) {
 		try {
 			Deflater deflater = new Deflater();
-			deflater.setInput(inputData);
+			deflater.setInput(inputData, offset, length);
 			deflater.finish();
 
 			ByteArrayOutputStream bos = new ByteArrayOutputStream(inputData.length);
@@ -49,7 +61,7 @@ public class HawkZlib {
 		}
 		return null;
 	}
-
+	
 	/**
 	 * 解压缩
 	 * 
@@ -57,25 +69,30 @@ public class HawkZlib {
 	 * @return
 	 */
 	public static byte[] zlibInflate(byte[] inputData) {
+		return zlibInflate(inputData, 0, inputData.length);
+	}
+	
+	/**
+	 * 解压缩
+	 * 
+	 * @param inputData
+	 * @return
+	 */
+	public static byte[] zlibInflate(byte[] inputData, int offset, int length) {
 		try {
 			Inflater inflater = new Inflater();
-			inflater.setInput(inputData);
+			inflater.setInput(inputData, offset, length);
 
-			ByteArrayOutputStream bos = new ByteArrayOutputStream(inputData.length);
+			ByteArrayOutputStream bos = new ByteArrayOutputStream(length);
 			byte[] buf = new byte[1024];
 			while (!inflater.finished()) {
-				try {
-					int count = inflater.inflate(buf);
-					bos.write(buf, 0, count);
-				} catch (DataFormatException e) {
-					HawkException.catchException(e);
-					break;
-				}
+				int count = inflater.inflate(buf);
+				bos.write(buf, 0, count);
 			}
 			inflater.end();
 			bos.close();
 			return bos.toByteArray();
-		} catch (IOException e) {
+		} catch (Exception e) {
 			HawkException.catchException(e);
 		}
 		return null;

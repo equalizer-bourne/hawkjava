@@ -24,9 +24,11 @@ log4j.logger.Exception=info,Exception
 log4j.logger.Debug=info,Debug
 log4j.logger.Server=info,Server
 log4j.logger.Action=info,Action
-log4j.logger.Platform=info,Platform
 log4j.logger.Recharge=info,Recharge
 log4j.logger.Script=info,Script
+log4j.logger.Protocol=info,Protocol
+log4j.logger.Report=info,Report
+log4j.logger.Platform=info,Platform
 
 log4j.appender.Hawk=org.apache.log4j.DailyRollingFileAppender
 log4j.appender.Hawk.Encoding=UTF-8
@@ -68,14 +70,6 @@ log4j.appender.Action.append=true
 log4j.appender.Action.layout=org.apache.log4j.PatternLayout
 log4j.appender.Action.layout.ConversionPattern=%d - %m%n
 
-log4j.appender.Platform=org.apache.log4j.DailyRollingFileAppender
-log4j.appender.Platform.Encoding=UTF-8
-log4j.appender.Platform.File=../logs/Platform.log
-log4j.appender.Platform.datePattern='.'yyyyMMdd
-log4j.appender.Platform.append=true
-log4j.appender.Platform.layout=org.apache.log4j.PatternLayout
-log4j.appender.Platform.layout.ConversionPattern=%m%n
-
 log4j.appender.Recharge=org.apache.log4j.DailyRollingFileAppender
 log4j.appender.Recharge.Encoding=UTF-8
 log4j.appender.Recharge.File=../logs/Recharge.log
@@ -91,3 +85,27 @@ log4j.appender.Script.datePattern='.'yyyyMMdd
 log4j.appender.Script.append=true
 log4j.appender.Script.layout=org.apache.log4j.PatternLayout
 log4j.appender.Script.layout.ConversionPattern=%d - %m%n
+
+log4j.appender.Protocol=org.apache.log4j.DailyRollingFileAppender
+log4j.appender.Protocol.Encoding=UTF-8
+log4j.appender.Protocol.File=../logs/Protocol.log
+log4j.appender.Protocol.datePattern='.'yyyyMMdd
+log4j.appender.Protocol.append=true
+log4j.appender.Protocol.layout=org.apache.log4j.PatternLayout
+log4j.appender.Protocol.layout.ConversionPattern=%d - %m%n
+
+log4j.appender.Report=org.apache.log4j.DailyRollingFileAppender
+log4j.appender.Report.Encoding=UTF-8
+log4j.appender.Report.File=../logs/Report.log
+log4j.appender.Report.datePattern='.'yyyyMMdd
+log4j.appender.Report.append=true
+log4j.appender.Report.layout=org.apache.log4j.PatternLayout
+log4j.appender.Report.layout.ConversionPattern=%d - %m%n
+
+log4j.appender.Platform=org.apache.log4j.DailyRollingFileAppender
+log4j.appender.Platform.Encoding=UTF-8
+log4j.appender.Platform.File=../logs/Platform.log
+log4j.appender.Platform.datePattern='.'yyyyMMdd
+log4j.appender.Platform.append=true
+log4j.appender.Platform.layout=org.apache.log4j.PatternLayout
+log4j.appender.Platform.layout.ConversionPattern=%m%n

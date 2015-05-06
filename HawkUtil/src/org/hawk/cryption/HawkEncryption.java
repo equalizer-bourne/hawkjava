@@ -39,6 +39,13 @@ public class HawkEncryption {
 	}
 
 	/**
+	 * 重置
+	 */
+	public void resetDeflater() {
+		deflater.reset();
+	}
+	
+	/**
 	 * 加密
 	 * @param input
 	 * @return

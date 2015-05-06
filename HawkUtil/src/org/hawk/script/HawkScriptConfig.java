@@ -1,8 +1,9 @@
 package org.hawk.script;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
@@ -10,12 +11,48 @@ import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 import org.hawk.os.HawkException;
 
+import com.google.gson.JsonObject;
+
 /**
  * 脚本配置文件
  * 
  * @author hawk
  */
 public class HawkScriptConfig {
+	/**
+	 * 脚本信息
+	 * @author hawk
+	 */
+	public class ScriptInfo {
+		protected String  id;
+		protected String  classNme;
+		protected boolean autoRun = false;
+		
+		public String getId() {
+			return id;
+		}
+		
+		public void setId(String id) {
+			this.id = id;
+		}
+		
+		public String getClassName() {
+			return classNme;
+		}
+		
+		public void setClassName(String classNme) {
+			this.classNme = classNme;
+		}
+		
+		public boolean isAutoRun() {
+			return autoRun;
+		}
+		
+		public void setAutoRun(boolean autoRun) {
+			this.autoRun = autoRun;
+		}
+	}
+	
 	/**
 	 * http地址
 	 */
@@ -35,7 +72,7 @@ public class HawkScriptConfig {
 	/**
 	 * 类名和命令id的映射表
 	 */
-	private Map<String, String> idNameMap;
+	private Map<String, ScriptInfo> scriptMap;
 
 	/**
 	 * 获取http地址
@@ -46,6 +83,23 @@ public class HawkScriptConfig {
 		return httpAddr;
 	}
 
+	/**
+	 * 获取http端口
+	 * 
+	 * @return
+	 */
+	public int getHttpPort() {
+		String[] items = httpAddr.split(":");
+		try {
+			if (items.length > 1) {
+				return Integer.valueOf(items[1]);
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return 0;
+	}
+	
 	/**
 	 * 获取基础源码路径
 	 * 
@@ -69,18 +123,35 @@ public class HawkScriptConfig {
 	 * 
 	 * @return
 	 */
-	public Map<String, String> getIdNameMap() {
-		return idNameMap;
+	public Map<String, ScriptInfo> getScriptMap() {
+		return scriptMap;
 	}
 
+	/**
+	 * 获取脚本信息
+	 * 
+	 * @return
+	 */
+	public JsonObject toJsonInfo() {
+		JsonObject jsonObject = new JsonObject();
+		try {
+			for (Entry<String, ScriptInfo> entry : scriptMap.entrySet()) {
+				jsonObject.addProperty(entry.getValue().getId(), entry.getValue().getClassName());
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return jsonObject;
+	}
+	
 	/**
 	 * 通过id找到类名
 	 * 
 	 * @param id
 	 * @return
 	 */
-	public String getNameById(String id) {
-		return idNameMap.get(id);
+	public ScriptInfo getScriptById(String id) {
+		return scriptMap.get(id);
 	}
 
 	/**
@@ -106,7 +177,7 @@ public class HawkScriptConfig {
 	 */
 	@SuppressWarnings("unchecked")
 	public HawkScriptConfig(String xmlPath) {
-		idNameMap = new HashMap<String, String>();
+		scriptMap = new ConcurrentHashMap<String, ScriptInfo>();
 		SAXReader saxReader = new SAXReader();
 		try {
 			Document document = saxReader.read(xmlPath);
@@ -126,10 +197,14 @@ public class HawkScriptConfig {
 			
 			Iterator<Element> itemIterator = rootElement.elementIterator();
 			while (itemIterator.hasNext()) {
+				ScriptInfo scriptInfo = new ScriptInfo();
 				Element element = itemIterator.next();
-				String id = element.attributeValue("id");
-				String cName = element.attributeValue("className");
-				idNameMap.put(id, cName);
+				scriptInfo.id = element.attributeValue("id");
+				scriptInfo.classNme = element.attributeValue("className");
+				if (element.attribute("autoRun") != null) {
+					scriptInfo.autoRun = Boolean.valueOf(element.attributeValue("autoRun"));
+				}
+				scriptMap.put(scriptInfo.id, scriptInfo);
 			}
 		} catch (DocumentException e) {
 			HawkException.catchException(e);

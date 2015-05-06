@@ -34,7 +34,7 @@ public class HawkOctetsStream {
 	 * @return
 	 */
 	public static HawkOctetsStream create() {
-		return create(1024);
+		return create(4096);
 	}
 
 	/**
@@ -78,6 +78,7 @@ public class HawkOctetsStream {
 		HawkOctetsStream os = new HawkOctetsStream();
 		os.isDirect = buffer.isDirect();
 		os.byteBuffer = allocateBuffer(buffer.capacity(), buffer.isDirect()).order(buffer.order()).put(buffer);
+		os.byteBuffer.flip();
 		return os;
 	}
 
@@ -239,7 +240,7 @@ public class HawkOctetsStream {
 	 * @param size
 	 * @return
 	 */
-	private final HawkOctetsStream expand(int size) {
+	public final HawkOctetsStream expand(int size) {
 		int end = position() + size;
 		if (end > capacity()) {
 			int cap = capacity() * 3 / 2 + 1;
@@ -438,12 +439,24 @@ public class HawkOctetsStream {
 	
 	/**
 	 * 直接写入字节数组
-	 * @param buffer
+	 * @param bytes
 	 */
 	public final HawkOctetsStream pushBytes(byte[] bytes) {
 		if (bytes != null) {
 			expand(bytes.length);
 			byteBuffer.put(bytes);
+		}
+		return this;
+	}
+	
+	/**
+	 * 直接写入字节数组
+	 * @param bytes
+	 */
+	public final HawkOctetsStream pushBytes(byte[] bytes, int offset, int length) {
+		if (bytes != null) {
+			expand(length);
+			byteBuffer.put(bytes, offset, length);
 		}
 		return this;
 	}
@@ -456,7 +469,7 @@ public class HawkOctetsStream {
 	public final HawkOctetsStream pushBuffer(ByteBuffer buffer) {
 		if (buffer != null) {
 			expand(buffer.remaining());
-			byteBuffer.put(buffer);
+			byteBuffer.put(buffer.array(), buffer.position(), buffer.remaining());
 		}
 		return this;
 	}

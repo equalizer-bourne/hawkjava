@@ -2,6 +2,7 @@ package org.hawk.os;
 
 import org.hawk.app.HawkApp;
 import org.hawk.log.HawkLog;
+import org.hawk.script.HawkScriptManager;
 import org.hawk.util.HawkCallback;
 
 import sun.misc.Signal;
@@ -41,7 +42,7 @@ public class HawkShutdownHook implements Runnable {
 	 * @param notify
 	 * @return
 	 */
-	private boolean processShutdown(boolean notify) {
+	public boolean processShutdown(boolean notify) {
 		if (isShutdown) {
 			return false;
 		}
@@ -49,10 +50,14 @@ public class HawkShutdownHook implements Runnable {
 		HawkLog.logPrintln("hawk start shutting down");
 
 		// 回调唤起
-		if (callback != null) {
-			callback.invoke(notify);
+		try {
+			if (callback != null) {
+				callback.invoke(notify);
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
 		}
-
+		
 		// 通知app关闭
 		HawkApp.getInstance().onShutdown();
 
@@ -94,19 +99,18 @@ public class HawkShutdownHook implements Runnable {
 			}
 		});
 
-		// kill -12信号处理注册
-		SignalHandler handler = new SignalHandler() {
-			public void handle(Signal signal) {
-				processShutdown(false);
-				System.exit(0);
-			}
-		};
-		// 注册回调
+		// kill -12信号处理注册回调
 		try {
-			Signal.handle(new Signal("USR2"), handler);
+			Signal.handle(new Signal("USR2"), new kill_SignalHandler("USR2"));
 		} catch (Exception e) {
 		}
 
+		// kill -17信号处理注册回调
+		try {
+			Signal.handle(new Signal("CHLD"), new script_SignalHandler("CHLD"));
+		} catch (Exception e) {
+		}
+		
 		if (HawkApp.getInstance().isDebug() && HawkOSOperator.isWindowsOS()) {
 			Thread thread = new Thread(this);
 			thread.setName("WinConsole");
@@ -121,6 +125,41 @@ public class HawkShutdownHook implements Runnable {
 		} catch (Exception e) {
 			HawkException.catchException(e);
 		}
-		HawkApp.getInstance().breakLoop();
+		processShutdown(true);
+	}
+	
+	/**
+	 * 
+	 * @author hawk
+	 */
+	private class kill_SignalHandler implements SignalHandler {
+		private String signalName;
+		
+		public kill_SignalHandler(String name) {
+			this.signalName = name;
+		}
+		
+		public void handle(Signal signal) {
+			HawkLog.logPrintln("signal handler: " + this.getClass().getSimpleName() + ", name: " + signalName);
+			processShutdown(false);
+			System.exit(0);
+		}
+	}
+	
+	/**
+	 * 
+	 * @author hawk
+	 */
+	private class script_SignalHandler implements SignalHandler {
+		private String signalName;
+		
+		public script_SignalHandler(String name) {
+			this.signalName = name;
+		}
+		
+		public void handle(Signal signal) {
+			HawkLog.logPrintln("signal handler: " + this.getClass().getSimpleName() + ", name: " + signalName);
+			HawkScriptManager.getInstance().restart();
+		}
 	}
 }

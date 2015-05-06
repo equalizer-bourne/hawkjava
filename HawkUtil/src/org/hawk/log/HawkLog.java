@@ -24,6 +24,10 @@ public class HawkLog {
 	 * 调试日志对象
 	 */
 	static Logger debugLogger = LoggerFactory.getLogger("Debug");
+	/**
+	 * 配置日志对象
+	 */
+	static Logger exceptionLogger = LoggerFactory.getLogger("Exception");
 	
 	/**
 	 * 开启控制台打印
@@ -38,7 +42,7 @@ public class HawkLog {
 	 * 调试模式输出
 	 * @param msg
 	 */
-	public static void debugPrintln(String msg) {
+	public synchronized static void debugPrintln(String msg) {
 		if (HawkApp.getInstance().isDebug()) {
 			debugLogger.info(msg);
 			
@@ -54,7 +58,7 @@ public class HawkLog {
 	 * 
 	 * @param msg
 	 */
-	public static void logPrintln(String msg) {
+	public synchronized static void logPrintln(String msg) {
 		logger.info(msg);
 		
 		// 控制台输出
@@ -68,7 +72,7 @@ public class HawkLog {
 	 * 
 	 * @param msg
 	 */
-	public static void errPrintln(String msg) {
+	public synchronized static void errPrintln(String msg) {
 		logger.error(msg);
 		
 		// 打印错误
@@ -80,11 +84,14 @@ public class HawkLog {
 	 * 
 	 * @param excep
 	 */
-	public static void exceptionPrint(Exception e) {
-		// 打印堆栈
-		e.printStackTrace();
-				
-		// 异常信息按照错误打印
-		logger.error(HawkException.formatStackMsg(e));
+	public synchronized static void exceptionPrint(Exception e) {
+		if (e != null) {
+			// 打印堆栈
+			e.printStackTrace();
+					
+			// 异常信息按照错误打印
+			String stackMsg = HawkException.formatStackMsg(e);
+			exceptionLogger.error(stackMsg);
+		}
 	}
 }

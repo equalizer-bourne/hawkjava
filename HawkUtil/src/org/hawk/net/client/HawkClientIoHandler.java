@@ -5,6 +5,7 @@ import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
 import org.hawk.net.HawkNetManager;
 import org.hawk.net.HawkSession;
+import org.hawk.os.HawkException;
 
 /**
  * 客户端io处理器
@@ -19,6 +20,14 @@ public class HawkClientIoHandler extends IoHandlerAdapter {
 	public void sessionOpened(IoSession session) throws Exception {
 		// 读写通道无操作进入空闲状态
 		session.getConfig().setIdleTime(IdleStatus.BOTH_IDLE, HawkNetManager.getInstance().getSessionIdleTime());
+		try {
+			HawkClientSession clientSession = (HawkClientSession) session.getAttribute(HawkSession.SESSION_ATTR);
+			if (clientSession != null) {
+				clientSession.onOpened();
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
 	}
 
 	/**

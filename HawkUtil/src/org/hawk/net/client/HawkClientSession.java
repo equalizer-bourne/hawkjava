@@ -8,6 +8,7 @@ import org.apache.mina.core.service.IoConnector;
 import org.apache.mina.core.session.IoSession;
 import org.hawk.cryption.HawkDecryption;
 import org.hawk.cryption.HawkEncryption;
+import org.hawk.log.HawkLog;
 import org.hawk.net.HawkNetManager;
 import org.hawk.net.HawkSession;
 import org.hawk.net.protocol.HawkProtocol;
@@ -167,7 +168,7 @@ public abstract class HawkClientSession {
 	 * @return
 	 */
 	public boolean sendProtocol(HawkProtocol protocol) {
-		if (isActive()) {
+		if (isActive() && protocol != null) {
 			try {
 				session.write(protocol);
 				return true;
@@ -179,11 +180,30 @@ public abstract class HawkClientSession {
 	}
 
 	/**
+	 * 发送数据
+	 * 
+	 * @param message
+	 * @return
+	 */
+	public boolean sendMessage(Object message) {
+		if (isActive() && message != null) {
+			try {
+				session.write(message);
+				return true;
+			} catch (Exception e) {
+				HawkException.catchException(e);
+			}
+		}
+		HawkLog.errPrintln(String.format("send message failed, active: %s", active?"true":"false"));
+		return false;
+	}
+	
+	/**
 	 * 会话接收到消息, 外部可重载进行处理
 	 * 
 	 * @param message
 	 */
-	protected abstract void onReceived(Object message);
+	protected abstract boolean onReceived(Object message);
 
 	/**
 	 * 关闭会话
@@ -213,6 +233,12 @@ public abstract class HawkClientSession {
 	}
 
 	/**
+	 * 连接已打开
+	 */
+	public void onOpened() {
+	}
+
+	/**
 	 * 解码错误回调
 	 */
 	public void onDecodeError() {
@@ -222,7 +248,7 @@ public abstract class HawkClientSession {
 	/**
 	 * 会话被关闭
 	 */
-	public void onClosed() {
+	protected void onClosed() {
 		if (this.session != null) {
 			// 清理属性
 			this.session.setAttribute(HawkSession.SESSION_ATTR, null);

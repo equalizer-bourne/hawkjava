@@ -3,17 +3,21 @@ package org.hawk.config;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PropertyResourceBundle;
 import java.util.ResourceBundle;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -27,11 +31,14 @@ import org.hawk.cryption.HawkMd5;
 import org.hawk.log.HawkLog;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkOSOperator;
+import org.hawk.util.HawkJsonUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+
+import com.google.gson.reflect.TypeToken;
 
 /**
  * 单个类型
@@ -40,6 +47,11 @@ import org.w3c.dom.NodeList;
  * 
  */
 public class HawkConfigStorage {
+	
+	/**
+	 * 日期转化器
+	 */
+	private static DateFormat DATE_FORMATOR = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	/**
 	 * 配置类型
 	 */
@@ -65,7 +77,11 @@ public class HawkConfigStorage {
 	 * 配置对象映射表
 	 */
 	private Map<Object, HawkConfigBase> configMap = null;
-
+	/**
+	 * 域映射
+	 */
+	private static Map<String, Field> classFieldMap = new ConcurrentHashMap<String, Field>();
+	
 	/**
 	 * 构造函数
 	 * 
@@ -82,7 +98,7 @@ public class HawkConfigStorage {
 			HawkLog.logPrintln("load config: " + filePath);
 
 			if ("map".equals(xmlRes.struct())) {
-				configMap = new HashMap<Object, HawkConfigBase>();
+				configMap = new TreeMap<Object, HawkConfigBase>();
 			} else if ("list".equals(xmlRes.struct())) {
 				configList = new LinkedList<HawkConfigBase>();
 			} else {
@@ -108,7 +124,7 @@ public class HawkConfigStorage {
 			HawkLog.logPrintln("load config: " + filePath);
 
 			if ("map".equals(jsonRes.struct())) {
-				configMap = new HashMap<Object, HawkConfigBase>();
+				configMap = new TreeMap<Object, HawkConfigBase>();
 			} else if ("list".equals(jsonRes.struct())) {
 				configList = new LinkedList<HawkConfigBase>();
 			} else {
@@ -157,23 +173,34 @@ public class HawkConfigStorage {
 						Object cfg = cfgClass.newInstance();
 						if (cfg instanceof HawkConfigBase) {
 							HawkConfigBase configBase = (HawkConfigBase) cfg;
-
+							configBase.setStorage(this);
+							
 							Object cfgKey = null;
 							for (int j = 0; j < attrMap.getLength(); j++) {
 								Node attrNode = attrMap.item(j);
 								// 测试Id标注是否存在
-								Field field = cfg.getClass().getDeclaredField(attrNode.getNodeName().trim());
-								Id id = field.getAnnotation(Id.class);
+								Field field = getField(cfg,attrNode.getNodeName().trim());
+								if (field == null) {
+									throw new HawkException("config class field not exist, file: " + filePath + ", field: " + attrNode.getNodeName().trim());
+								}
+								
+								Id id = null;
+								try {
+									id = field.getAnnotation(Id.class);
+								} catch (Exception e) {
+									throw new NullPointerException("config id annotation not exist: " + cfg.getClass().getName() + ", nodeName: "+ attrNode.getNodeName());
+								}
+								
 								if (id != null) {
 									// id标注重复
 									if (cfgKey != null) {
-										throw new HawkException("config id annotation duplicate: " + filePath);
+										throw new HawkException("config id annotation duplicate: " + filePath + ", nodeName: "+ attrNode.getNodeName());
 									}
 									
 									String type = field.getType().toString();
-									if (type.indexOf("int") > 0 || type.indexOf("Integer") > 0) {
+									if (type.indexOf("int") >= 0 || type.indexOf("Integer") >= 0) {
 										cfgKey = Integer.valueOf(attrNode.getNodeValue().trim());
-									} else if (type.indexOf("String") > 0) {
+									} else if (type.indexOf("String") >= 0) {
 										cfgKey = attrNode.getNodeValue().trim();
 									}
 								}
@@ -199,6 +226,8 @@ public class HawkConfigStorage {
 										throw new Exception("config mapping key is null");
 									}
 								}
+							} else {
+								throw new Exception("config assemble failed: " + cfgClass.getName() + ", key: " + cfgKey);
 							}
 						}
 					}
@@ -224,7 +253,7 @@ public class HawkConfigStorage {
 
 			ResourceBundle bundle = null;
 			try {
-				bundle = new PropertyResourceBundle(new BufferedInputStream(new FileInputStream(file)));
+				bundle = new PropertyResourceBundle(new InputStreamReader(new BufferedInputStream(new FileInputStream(file)), "UTF-8"));
 			} catch (Exception e) {
 				throw e;
 			}
@@ -232,13 +261,25 @@ public class HawkConfigStorage {
 			if (bundle != null) {
 				Enumeration<String> keys = bundle.getKeys();
 				Object cfg = cfgClass.newInstance();
-				while (keys.hasMoreElements()) {
-					String key = keys.nextElement().trim();
-					setAttr(cfg, key, bundle.getString(key).trim());
-				}
+				if (cfg instanceof HawkConfigBase) {
+					HawkConfigBase configBase = (HawkConfigBase) cfg;
+					configBase.setStorage(this);
+					
+					while (keys.hasMoreElements()) {
+						String key = keys.nextElement().trim();
+						setAttr(configBase, key, bundle.getString(key).trim());
+					}
 
-				// 存储
-				configList.add((HawkConfigBase) cfg);
+					// 通知上层装配
+					if (configBase.assemble()) {
+						// 常量锁定
+						configBase.lockConst(true);
+						// 存储
+						configList.add(configBase);
+					} else {
+						throw new Exception("config assemble failed: " + cfgClass.getName());
+					}
+				}
 			}
 		} catch (Exception e) {
 			throw e;
@@ -259,7 +300,7 @@ public class HawkConfigStorage {
 				throw new HawkException("config file not exist: " + filePath);
 			}
 			
-			String fileData = HawkOSOperator.readFile(filePath);
+			String fileData = HawkOSOperator.readTextFile(filePath);
 			if (fileData != null) {
 				JSONObject jsonObject = JSONObject.fromObject(fileData);
 				JSONArray jsonArray = null;
@@ -277,7 +318,8 @@ public class HawkConfigStorage {
 					Object cfg = cfgClass.newInstance();
 					if (cfg instanceof HawkConfigBase) {
 						HawkConfigBase configBase = (HawkConfigBase) cfg;
-
+						configBase.setStorage(this);
+						
 						Object cfgKey = null;
 						Iterator<?> it = jsonCfgObj.keys();
 			            while (it.hasNext()) {  
@@ -286,16 +328,23 @@ public class HawkConfigStorage {
 			                
 			                // 测试Id标注是否存在
 							Field field = cfg.getClass().getDeclaredField(key.trim());
-							Id id = field.getAnnotation(Id.class);
+
+							Id id = null;
+							try {
+								id = field.getAnnotation(Id.class);
+							} catch (Exception e) {
+								throw new NullPointerException("config id annotation not exist: " + cfg.getClass().getName() + ", nodeName: "+ key);
+							}
+							
 							if (id != null) {
 								// id标注重复
 								if (cfgKey != null) {
 									throw new HawkException("config id annotation duplicate: " + filePath);
 								}
 								String type = field.getType().toString();
-								if (type.indexOf("int") > 0 || type.indexOf("Integer") > 0) {
+								if (type.indexOf("int") >= 0 || type.indexOf("Integer") >= 0) {
 									cfgKey = Integer.valueOf(value.trim());
-								} else if (type.indexOf("String") > 0) {
+								} else if (type.indexOf("String") >= 0) {
 									cfgKey = value.trim();
 								}
 							}
@@ -321,6 +370,8 @@ public class HawkConfigStorage {
 									throw new Exception("config mapping key is null");
 								}
 							}
+						} else {
+							throw new Exception("config assemble failed: " + cfgClass.getName() + ", key: " + cfgKey);
 						}
 					}
 				}
@@ -345,6 +396,24 @@ public class HawkConfigStorage {
 	}
 
 	/**
+	 * 获取域
+	 * @param instance
+	 * @param attrName
+	 * @return
+	 */
+	private Field getField(Object instance, String attrName) {
+		String fieldName = instance.getClass().getName() + "." + attrName;
+		Field field = classFieldMap.get(fieldName);
+		if (field == null) {
+			field = HawkOSOperator.getClassField(instance, attrName);
+			if (field != null) {
+				classFieldMap.put(fieldName, field);
+			}
+		}
+		return field;
+	}
+	
+	/**
 	 * 给指定对象调用set方法设置属性值，现在仅判断int float long double string 类型
 	 * 
 	 * @param instance
@@ -352,14 +421,13 @@ public class HawkConfigStorage {
 	 * @param attrValue
 	 */
 	public void setAttr(Object instance, String attrName, String attrValue) throws Exception {
-		Field field = null;
+		Field field = getField(instance, attrName);
+		if (field == null) {
+			HawkLog.errPrintln(String.format("config class cannot find field, class: %s, field: %s", instance.getClass().getName(), attrName));
+			throw new Exception("config class cannot find field");
+		}
+		
 		try {
-			try {
-				field = instance.getClass().getField(attrName);
-			} catch (NoSuchFieldException e) {
-				field = instance.getClass().getDeclaredField(attrName);
-			}
-
 			// 必须带final属性
 			if ((field.getModifiers() & Modifier.FINAL) == 0) {
 				throw new RuntimeException("config attribute must be final, class: " + instance.getClass().getSimpleName() + ", field: " + attrName);
@@ -373,7 +441,23 @@ public class HawkConfigStorage {
 
 			String type = field.getType().toString();
 			if (setMethod != null) {
-				if (type.indexOf("boolean") >= 0 || type.indexOf("Boolean") >= 0) {
+				if (field.getType() == int[].class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<int[]>() {}.getType()));
+				} else if (field.getType() == Integer[].class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<Integer[]>() {}.getType()));
+				} else if (field.getType() == float[].class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<float[]>() {}.getType()));
+				} else if (field.getType() == Float[].class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<Float[]>() {}.getType()));
+				} else if (field.getType() == double[].class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<double[]>() {}.getType()));
+				} else if (field.getType() == Double[].class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<Double[]>() {}.getType()));
+				}else if (field.getType() == String[].class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<String[]>() {}.getType()));
+				} else if (field.getType() == Map.class){
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue,new TypeToken<Map<String, String>>() {}.getType()));
+				} else if (type.indexOf("boolean") >= 0 || type.indexOf("Boolean") >= 0) {
 					setMethod.invoke(instance, Boolean.valueOf(attrValue));
 				} else if (type.indexOf("int") >= 0 || type.indexOf("Integer") >= 0) {
 					setMethod.invoke(instance, Integer.valueOf(attrValue));
@@ -385,14 +469,37 @@ public class HawkConfigStorage {
 					setMethod.invoke(instance, Double.valueOf(attrValue));
 				} else if (type.indexOf("String") >= 0) {
 					setMethod.invoke(instance, attrValue);
+				} else if (type.indexOf("Date") >= 0) {
+					setMethod.invoke(instance, DATE_FORMATOR.parse(attrValue));
+				} else {
+					throw new Exception("cannot support property type: " + type);
 				}
 			} else {
 				field.setAccessible(true);
 				final Field modifiersField = Field.class.getDeclaredField("modifiers");
 				modifiersField.setAccessible(true);
 				modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-
-				if (type.indexOf("boolean") >= 0 || type.indexOf("Boolean") >= 0) {
+				if (field.getType() == int[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<int[]>() {}.getType()));
+				} else if (field.getType() == Integer[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<Integer[]>() {}.getType()));
+				} else if (field.getType() == long[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<long[]>() {}.getType()));
+				} else if (field.getType() == Long[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<Long[]>() {}.getType()));
+				} else if (field.getType() == float[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<float[]>() {}.getType()));
+				} else if (field.getType() == Float[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<Float[]>() {}.getType()));
+				} else if (field.getType() == double[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<double[]>() {}.getType()));
+				} else if (field.getType() == Double[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<Double[]>() {}.getType()));
+				} else if (field.getType() == String[].class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<String[]>() {}.getType()));
+				} else if (field.getType() == Map.class) {
+					field.set(instance, HawkJsonUtil.getJsonInstance().fromJson(attrValue, new TypeToken<Map<String, String>>() {}.getType()));
+				} else if (type.indexOf("boolean") >= 0 || type.indexOf("Boolean") >= 0) {
 					field.set(instance, Boolean.valueOf(attrValue));
 				} else if (type.indexOf("int") >= 0 || type.indexOf("Integer") >= 0) {
 					field.set(instance, Integer.valueOf(attrValue));
@@ -404,6 +511,10 @@ public class HawkConfigStorage {
 					field.set(instance, Double.valueOf(attrValue));
 				} else if (type.indexOf("String") >= 0) {
 					field.set(instance, attrValue);
+				} else if (type.indexOf("Date") >= 0) {
+					field.set(instance, DATE_FORMATOR.parse(attrValue));
+				} else {
+					throw new Exception("cannot support property type: " + type);
 				}
 
 				modifiersField.setInt(field, field.getModifiers() | Modifier.FINAL);
@@ -411,6 +522,7 @@ public class HawkConfigStorage {
 				field.setAccessible(false);
 			}
 		} catch (Exception e) {
+			HawkLog.errPrintln(String.format("config setAttr failed, class: %s, field: %s", instance.getClass().getName(), attrName));
 			throw e;
 		}
 	}
@@ -434,11 +546,42 @@ public class HawkConfigStorage {
 	}
 
 	/**
+	 * 检测配置文件有效性
+	 * @return
+	 */
+	public boolean checkValid() {
+		if (configList != null) {
+			for (HawkConfigBase configBase : configList) {
+				if (!configBase.checkValid()) {
+					return false;
+				}
+			}
+		}
+		
+		if (configMap != null) {
+			for (Map.Entry<Object, HawkConfigBase> entry : configMap.entrySet()) {
+				if (!entry.getValue().checkValid()) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+	
+	/**
+	 * 获取文件路径
+	 * @return
+	 */
+	public String getFilePath() {
+		return filePath;
+	}
+	
+	/**
 	 * 获取配置列表
 	 * 
 	 * @return
 	 */
-	public List<HawkConfigBase> getConfigList() {
+	public List<? extends HawkConfigBase> getConfigList() {
 		return configList;
 	}
 
@@ -447,7 +590,7 @@ public class HawkConfigStorage {
 	 * 
 	 * @return
 	 */
-	public Map<Object, HawkConfigBase> getConfigMap() {
+	public Map<Object, ? extends HawkConfigBase> getConfigMap() {
 		return configMap;
 	}
 }
