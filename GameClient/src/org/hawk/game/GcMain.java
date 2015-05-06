@@ -7,57 +7,17 @@ import org.hawk.log.HawkLog;
 import org.hawk.net.protocol.HawkProtocol;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkOSOperator;
-import org.hawk.rpc.HawkRpcClient;
-import org.hawk.rpc.HawkRpcWorker;
-import org.hawk.zmq.HawkZmq;
-import org.hawk.zmq.HawkZmqManager;
 
 import com.google.protobuf.ByteString;
-import com.hawk.game.protocol.SysProtocol.DataWarpper;
+import com.hawk.game.protocol.SysProtocol.HPDataWarpper;
 
 public class GcMain {
-	public static class RpcWorker extends HawkRpcWorker {
-		@Override
-		public HawkProtocol response(HawkProtocol protocol) {
-			return protocol;
-		}
-	}
-	
-	public static void test_RpcClient() {
-		HawkRpcClient rpcClient = new HawkRpcClient();
-		if (rpcClient.init("tcp://10.0.3.110:9595")) {
-			while (true) {
-				try {
-					DataWarpper.Builder builder = DataWarpper.newBuilder();
-					String value = HawkOSOperator.randomString(64);
-					builder.setData(ByteString.copyFrom(value, "utf-8"));
-					HawkProtocol response = rpcClient.request(new HawkProtocol(1, builder), 10000);
-					if (response != null) {
-						DataWarpper data = response.parseProtocol(DataWarpper.getDefaultInstance());
-						System.out.println("Response: " + data.getData().toString("utf-8"));
-					}
-				} catch (Exception e) {
-					HawkException.catchException(e);
-				}
-			}
-		}
-	}
-	
 	public static void main(String[] args) {
-		// 打印启动参数
 		for (int i = 0; i < args.length; i++) {
 			HawkLog.logPrintln(args[i]);
 		}
-		
-		// 添加库加载目录
 		HawkOSOperator.addUsrPath(System.getProperty("user.dir") + "/lib");
 		
-		// 初始化zmq管理器
-		HawkZmqManager.getInstance().init(HawkZmq.HZMQ_CONTEXT_THREAD);
-		
-		test_RpcClient();
-		
-		// 获取参数
 		String ip = "127.0.0.1";
 		if (args.length > 0) {
 			ip = args[0];
@@ -97,15 +57,15 @@ public class GcMain {
 
 			while (true) {
 				for (GcSession session : sessions) {
-					DataWarpper.Builder builder = DataWarpper.newBuilder();
+					HPDataWarpper.Builder builder = HPDataWarpper.newBuilder();
 					String value = HawkOSOperator.randomString(64);
 					builder.setData(ByteString.copyFrom(value, "utf-8"));
-					session.sendProtocol(new HawkProtocol(1, builder));
+					session.sendProtocol(HawkProtocol.valueOf(1, builder));
 				}
 				HawkOSOperator.osSleep(sleep);
 			}
-
 		} catch (Exception e) {
+			HawkException.catchException(e);
 		}
 	}
 }
