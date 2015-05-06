@@ -3,10 +3,13 @@ package com.hawk.cdk.http.handler;
 import java.io.IOException;
 import java.util.Map;
 
+import org.hawk.util.services.HawkCdkService;
+
 import net.sf.json.JSONObject;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import com.hawk.cdk.Cdk;
 import com.hawk.cdk.CdkServices;
 import com.hawk.cdk.data.CdkInfo;
 import com.hawk.cdk.data.CdkTypeReward;
@@ -22,24 +25,26 @@ public class QueryCdkHandler implements HttpHandler {
 
 	@Override
 	public void handle(HttpExchange httpExchange) throws IOException {
-		int status = CdkServices.CDK_PARAM_ERROR;
+		int status = HawkCdkService.CDK_PARAM_ERROR;
 		JSONObject jsonObject = new JSONObject();
 
 		CdkInfo cdkInfo = null;
 		Map<String, String> params = CdkHttpServer.parseHttpParam(httpExchange);
+		Cdk.checkToken(params.get("token"));
+		
 		QueryCdkParam cdkparam = new QueryCdkParam();
 		if (cdkparam.initParam(params)) {
 			cdkparam.toLowerCase();
 			cdkInfo = CdkServices.getInstance().queryCdkInfo(cdkparam);
 			if (cdkInfo != null) {
-				status = CdkServices.CDK_STATUS_OK;
+				status = HawkCdkService.CDK_STATUS_OK;
 			} else {
-				status = CdkServices.CDK_STATUS_NONEXIST;
+				status = HawkCdkService.CDK_STATUS_NONEXIST;
 			}
 		}
 
 		jsonObject.put("status", String.valueOf(status));
-		if (status == CdkServices.CDK_STATUS_OK) {
+		if (status == HawkCdkService.CDK_STATUS_OK) {
 			String gameName = CdkServices.getInstance().getGameNameFromCdk(cdkparam.getCdk());
 			String typeName = CdkServices.getInstance().getTypeNameFromCdk(cdkparam.getCdk());
 			// 填充类型信息

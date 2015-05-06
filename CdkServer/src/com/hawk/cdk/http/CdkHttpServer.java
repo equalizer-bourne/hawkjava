@@ -8,6 +8,7 @@ import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -40,14 +41,14 @@ public class CdkHttpServer {
 	/**
 	 * cdk服务参数串格式
 	 */
-	private static final String del_cdk = "/del_cdk?cdk=%s"; // 多个可用逗号隔开
-	private static final String del_type = "/del_type?game=%s&type=%s";
-	private static final String gen_cdk = "/gen_cdk?game=%s&platform=%s&type=%s&count=%s&reward=%s&starttime=%s&endtime=%s";
-	private static final String append_cdk = "/append_cdk?game=%s&platform=%s&type=%s&count=%s";
-	private static final String query_cdk = "/query_cdk?cdk=%s";
-	private static final String query_type = "/query_type?game=%s&type=%s";
+	private static final String del_cdk 	 = "/del_cdk?cdk=%s"; // 多个可用逗号隔开
+	private static final String del_type 	 = "/del_type?game=%s&type=%s";
+	private static final String gen_cdk 	 = "/gen_cdk?game=%s&platform=%s&type=%s&count=%s&reward=%s&starttime=%s&endtime=%s";
+	private static final String append_cdk 	 = "/append_cdk?game=%s&platform=%s&type=%s&count=%s";
+	private static final String query_cdk 	 = "/query_cdk?cdk=%s";
+	private static final String query_type 	 = "/query_type?game=%s&type=%s";
 	private static final String reset_reward = "/reset_reward?game=%s&platform=%s&type=%s&reward=%s&starttime=%s&endtime=%s";
-	private static final String use_cdk = "/use_cdk?game=%s&platform=%s&server=%s&playerid=%s&puid=%s&playername=%s&cdk=%s";
+	private static final String use_cdk 	 = "/use_cdk?game=%s&platform=%s&server=%s&playerid=%s&puid=%s&playername=%s&cdk=%s";
 
 	/**
 	 * 服务器对象
@@ -60,7 +61,7 @@ public class CdkHttpServer {
 	public void setup(String addr, int port, int pool) {
 		try {
 			if (addr != null && addr.length() > 0) {
-				httpServer = HttpServer.create(new InetSocketAddress(addr, port), 0);
+				httpServer = HttpServer.create(new InetSocketAddress(addr, port), 0);				
 				// TODO: 暂时不支持多线程(若以后性能不足, 及时修改)
 				httpServer.setExecutor(Executors.newFixedThreadPool(1));
 
@@ -102,13 +103,21 @@ public class CdkHttpServer {
 	 * http请求回应内容
 	 * 
 	 * @param httpExchange
-	 * @param response
+	 * @param jsonObject
 	 */
 	public static void response(HttpExchange httpExchange, JSONObject jsonObject) {
-		try {
-			String response = jsonObject.toString();
-			if (response != null && response.length() > 0) {
+		response(httpExchange, jsonObject.toString());
+	}
 
+	/**
+	 * http请求回应内容
+	 * 
+	 * @param httpExchange
+	 * @param response
+	 */
+	public static void response(HttpExchange httpExchange, String response) {
+		try {
+			if (response != null && response.length() > 0) {
 				final byte[] bytes = response.getBytes("UTF-8");
 				httpExchange.sendResponseHeaders(200, bytes.length);
 				httpExchange.getResponseBody().write(bytes);
@@ -118,7 +127,7 @@ public class CdkHttpServer {
 			HawkException.catchException(e);
 		}
 	}
-
+	
 	/**
 	 * 解析http请求的参数
 	 * 

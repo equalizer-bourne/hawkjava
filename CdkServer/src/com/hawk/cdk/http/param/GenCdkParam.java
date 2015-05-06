@@ -3,8 +3,7 @@ package com.hawk.cdk.http.param;
 import java.util.Map;
 
 import org.hawk.os.HawkException;
-
-import com.hawk.cdk.CdkServices;
+import org.hawk.util.services.HawkCdkService;
 
 /**
  * cdk生成参数
@@ -32,27 +31,27 @@ public class GenCdkParam {
 
 	public void toLowerCase() {
 		if (game != null) {
-			game.toLowerCase();
+			game = game.toLowerCase();
 		}
 
 		if (platform != null) {
-			platform.toLowerCase();
+			platform = platform.toLowerCase();
 		}
 
 		if (type != null) {
-			type.toLowerCase();
+			type = type.toLowerCase();
 		}
 
 		if (reward != null) {
-			reward.toLowerCase();
+			reward = reward.toLowerCase();
 		}
 
 		if (starttime != null) {
-			starttime.toLowerCase();
+			starttime = starttime.toLowerCase();
 		}
 
 		if (endtime != null) {
-			endtime.toLowerCase();
+			endtime = endtime.toLowerCase();
 		}
 	}
 
@@ -128,12 +127,12 @@ public class GenCdkParam {
 			type = params.get("type");
 			reward = params.get("reward");
 
-			if (game.length() > CdkServices.CDK_HEADER_SIZE) {
-				game = game.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (game.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				game = game.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 
-			if (type.length() > CdkServices.CDK_HEADER_SIZE) {
-				type = type.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (type.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				type = type.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 
 			if (params.containsKey("platform")) {

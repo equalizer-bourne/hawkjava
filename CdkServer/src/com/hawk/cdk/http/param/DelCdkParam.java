@@ -20,7 +20,7 @@ public class DelCdkParam {
 
 	public void toLowerCase() {
 		for (int i = 0; cdks != null && i < cdks.size(); i++) {
-			cdks.get(i).toLowerCase();
+			cdks.set(i, cdks.get(i).toLowerCase());
 		}
 	}
 

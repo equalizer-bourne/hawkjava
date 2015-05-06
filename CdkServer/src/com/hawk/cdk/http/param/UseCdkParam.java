@@ -3,8 +3,7 @@ package com.hawk.cdk.http.param;
 import java.util.Map;
 
 import org.hawk.os.HawkException;
-
-import com.hawk.cdk.CdkServices;
+import org.hawk.util.services.HawkCdkService;
 
 /**
  * cdk使用参数
@@ -23,31 +22,31 @@ public class UseCdkParam {
 
 	public void toLowerCase() {
 		if (game != null) {
-			game.toLowerCase();
+			game = game.toLowerCase();
 		}
 
 		if (platform != null) {
-			platform.toLowerCase();
+			platform = platform.toLowerCase();
 		}
 
 		if (server != null) {
-			server.toLowerCase();
+			server = server.toLowerCase();
 		}
 
 		if (playerid != null) {
-			playerid.toLowerCase();
+			playerid = playerid.toLowerCase();
 		}
 
 		if (puid != null) {
-			puid.toLowerCase();
+			puid = puid.toLowerCase();
 		}
 
 		if (playername != null) {
-			playername.toLowerCase();
+			playername = playername.toLowerCase();
 		}
 
 		if (cdk != null) {
-			cdk.toLowerCase();
+			cdk = cdk.toLowerCase();
 		}
 	}
 
@@ -125,8 +124,8 @@ public class UseCdkParam {
 			playername = params.get("playername");
 			cdk = params.get("cdk");
 
-			if (game.length() > CdkServices.CDK_HEADER_SIZE) {
-				game = game.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (game.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				game = game.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 
 		} catch (Exception e) {

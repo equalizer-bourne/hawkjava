@@ -22,7 +22,7 @@ public class QueryCdkParam {
 
 	public void toLowerCase() {
 		if (cdk != null) {
-			cdk.toLowerCase();
+			cdk = cdk.toLowerCase();
 		}
 	}
 

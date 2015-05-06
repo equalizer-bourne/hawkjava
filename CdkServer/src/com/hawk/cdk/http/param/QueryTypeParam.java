@@ -3,8 +3,7 @@ package com.hawk.cdk.http.param;
 import java.util.Map;
 
 import org.hawk.os.HawkException;
-
-import com.hawk.cdk.CdkServices;
+import org.hawk.util.services.HawkCdkService;
 
 /**
  * cdk类型查询
@@ -33,25 +32,27 @@ public class QueryTypeParam {
 
 	public void toLowerCase() {
 		if (game != null) {
-			game.toLowerCase();
+			game = game.toLowerCase();
 		}
 
 		if (type != null) {
-			type.toLowerCase();
+			type = type.toLowerCase();
 		}
 	}
 
 	public boolean initParam(Map<String, String> params) {
 		try {
 			game = params.get("game");
-			type = params.get("type");
-
-			if (game.length() > CdkServices.CDK_HEADER_SIZE) {
-				game = game.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (params.containsKey("type")) {
+				type = params.get("type");
 			}
 
-			if (type.length() > CdkServices.CDK_HEADER_SIZE) {
-				type = type.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (game.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				game = game.substring(0, HawkCdkService.CDK_HEADER_SIZE);
+			}
+
+			if (type != null && type.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				type = type.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 
 		} catch (Exception e) {

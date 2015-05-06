@@ -1,23 +1,22 @@
 package com.hawk.cdk;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
+import org.hawk.db.cache.HawkMemCacheDB;
 import org.hawk.log.HawkLog;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkRand;
 import org.hawk.os.HawkTime;
+import org.hawk.util.services.HawkCdkService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.danga.MemCached.MemCachedClient;
 import com.hawk.cdk.data.CdkInfo;
 import com.hawk.cdk.data.CdkTypeReward;
 import com.hawk.cdk.http.param.AppendCdkParam;
@@ -38,26 +37,6 @@ import com.hawk.cdk.util.CdkUtil;
 public class CdkServices {
 	private static Logger logger = LoggerFactory.getLogger("CdkReward");
 
-	// 前端访问状态码
-	public static final int CDK_STATUS_OK = 0; // 可使用
-	public static final int CDK_STATUS_NONEXIST = 1; // 不存在
-	public static final int CDK_STATUS_FUTURE = 2; // 时间未到
-	public static final int CDK_STATUS_PAST = 3; // 已过期
-	public static final int CDK_STATUS_USED = 4; // 已使用
-	public static final int CDK_STATUS_PLAT = 5; // 平台不正确
-
-	// 后台操作错误码
-	public static final int CDK_TYPE_EXIST = 10; // CDK类型已存在
-	public static final int CDK_PARAM_ERROR = 11; // 参数错误
-	public static final int CDK_TYPE_NONEXIST = 12; // 类型不存在
-
-	// 常量定义
-	public static final int CDK_TOTAL_LENGTH = 16; // CDK长度
-	public static final int CDK_DIGIT_MIN_COUNT = 3; // 数字最少个数
-	public static final int CDK_NAMT_TYPE_LEN = 8; // 名字和类型占用的长度
-	public static final int CDK_CHAR_MIN_COUNT = 3; // 字符最少个数
-	public static final int CDK_HEADER_SIZE = 2; // cdk标记字节
-
 	// 定义memcached访问关键字
 	private static String MC_CDK_AUTHOR_KEY = "org.hawk.cdk.author";
 	private static String MC_CDK_TYPES_KEY = "org.hawk.cdk.types";
@@ -73,13 +52,9 @@ public class CdkServices {
 	 */
 	private int lastVisitTime = 0;
 	/**
-	 * 读写锁
+	 * MC客户端
 	 */
-	private Lock memCachedLock = null;
-	/**
-	 * MC客户端连接表
-	 */
-	private List<MemCachedClient> memCachedClients = null;
+	private HawkMemCacheDB memCachedClient = null;
 	/**
 	 * 类型奖励
 	 */
@@ -104,16 +79,21 @@ public class CdkServices {
 	/**
 	 * 初始化
 	 */
-	public void initMC() {
-		if (memCachedLock == null) {
-			memCachedLock = new ReentrantLock();
+	public boolean initMC(String addr, int timeout, int redisPort) {
+		// 创建连接
+		memCachedClient = new HawkMemCacheDB();
+		if (redisPort <= 0) {
+			if (!memCachedClient.initAsMemCached(addr, timeout)) {
+				return false;
+			}
+		} else {
+			if (!memCachedClient.initAsRedis(addr, redisPort)) {
+				return false;
+			}
 		}
-
-		if (memCachedClients == null) {
-			memCachedClients = new LinkedList<MemCachedClient>();
-		}
-
+		// 加载类型奖励
 		loadTypeRewards();
+		return true;
 	}
 
 	/**
@@ -123,50 +103,6 @@ public class CdkServices {
 	 */
 	public void logMsg(String msg) {
 		logger.info(msg);
-	}
-
-	/**
-	 * 获取一个mc对象
-	 * 
-	 * @return
-	 */
-	public MemCachedClient obtainMC() {
-		MemCachedClient mc = null;
-		memCachedLock.lock();
-		try {
-			if (memCachedClients.size() > 0) {
-				mc = memCachedClients.remove(0);
-			}
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		} finally {
-			memCachedLock.unlock();
-		}
-
-		// 没找到空闲即创建
-		if (mc == null) {
-			mc = new MemCachedClient();
-		}
-
-		return mc;
-	}
-
-	/**
-	 * 还回mc
-	 * 
-	 * @param mc
-	 */
-	public void givebackMC(MemCachedClient mc) {
-		if (mc != null) {
-			memCachedLock.lock();
-			try {
-				memCachedClients.add(mc);
-			} catch (Exception e) {
-				HawkException.catchException(e);
-			} finally {
-				memCachedLock.unlock();
-			}
-		}
 	}
 
 	/**
@@ -220,7 +156,7 @@ public class CdkServices {
 	 * @return
 	 */
 	public String getGameNameFromCdk(String cdk) {
-		if (cdk.length() == CDK_TOTAL_LENGTH) {
+		if (cdk.length() == HawkCdkService.CDK_TOTAL_LENGTH) {
 			char[] gameName = { cdk.charAt(1), cdk.charAt(3) };
 			return String.valueOf(gameName);
 		}
@@ -234,7 +170,7 @@ public class CdkServices {
 	 * @return
 	 */
 	public String getTypeNameFromCdk(String cdk) {
-		if (cdk.length() == CDK_TOTAL_LENGTH) {
+		if (cdk.length() == HawkCdkService.CDK_TOTAL_LENGTH) {
 			char[] typeName = { cdk.charAt(5), cdk.charAt(7) };
 			return String.valueOf(typeName);
 		}
@@ -255,7 +191,7 @@ public class CdkServices {
 		if (gameName.equals(game) && typeName.equals(type)) {
 			int charCount = 0;
 			int digitCount = 0;
-			for (int i = CDK_NAMT_TYPE_LEN; i < CDK_TOTAL_LENGTH; i++) {
+			for (int i = HawkCdkService.CDK_NAMT_TYPE_LEN; i < HawkCdkService.CDK_TOTAL_LENGTH; i++) {
 				char ch = cdk.charAt(i);
 				if (ch >= '0' && ch <= '9') {
 					digitCount++;
@@ -263,7 +199,7 @@ public class CdkServices {
 					charCount++;
 				}
 			}
-			return digitCount >= CDK_DIGIT_MIN_COUNT && charCount >= CDK_CHAR_MIN_COUNT;
+			return digitCount >= HawkCdkService.CDK_DIGIT_MIN_COUNT && charCount >= HawkCdkService.CDK_CHAR_MIN_COUNT;
 		}
 		return false;
 	}
@@ -277,18 +213,15 @@ public class CdkServices {
 	 */
 	public boolean addCdkTypeReward(CdkTypeReward typeReward) {
 		if (!typeRewardMap.containsKey(typeReward.getCdkGameType())) {
-			MemCachedClient mc = obtainMC();
 			try {
 				typeRewardMap.put(typeReward.getCdkGameType(), typeReward);
 				String typeRewardInfos = CdkUtil.typeRewardsToString(typeRewardMap);
-				if (mc.set(MC_CDK_TYPES_KEY, typeRewardInfos)) {
+				if (memCachedClient.setString(MC_CDK_TYPES_KEY, typeRewardInfos)) {
 					logMsg("Add TypeReward: " + typeReward.toString() + ", Time: " + HawkTime.getTimeString());
 					return true;
 				}
 			} catch (Exception e) {
 				HawkException.catchException(e);
-			} finally {
-				givebackMC(mc);
 			}
 		}
 		return false;
@@ -298,17 +231,15 @@ public class CdkServices {
 	 * 加载所有的类型奖励
 	 */
 	private void loadTypeRewards() {
-		MemCachedClient mc = obtainMC();
 		try {
-			Object cdkObj = mc.get(MC_CDK_TYPES_KEY);
-			if (cdkObj != null) {
-				String types = (String) cdkObj;
+			String types = memCachedClient.getString(MC_CDK_TYPES_KEY);
+			if (types != null) {
 				typeRewardMap = CdkUtil.stringToTypeRewards(types);
 				for (Map.Entry<String, CdkTypeReward> entry : typeRewardMap.entrySet()) {
 					HawkLog.logPrintln("Load Cdk Type: " + entry.getValue().toString());
 				}
 			} else {
-				boolean addRet = mc.add(MC_CDK_TYPES_KEY, "{}");
+				boolean addRet = memCachedClient.setString(MC_CDK_TYPES_KEY, "{}");
 				if (!addRet) {
 					HawkLog.logPrintln("Add MC_CDK_TYPES_KEY:{} Error");
 				}
@@ -316,11 +247,25 @@ public class CdkServices {
 			}
 		} catch (Exception e) {
 			HawkException.catchException(e);
-		} finally {
-			givebackMC(mc);
 		}
 	}
 
+	/**
+	 * 字符串jsonmap转换为字符串
+	 * 
+	 * @param jsonMap
+	 * @return
+	 */
+	public Map<String, CdkTypeReward> getGameTypeRewards(String game) {
+		Map<String, CdkTypeReward> typeRewardsInfos = new HashMap<String, CdkTypeReward>();
+		for (Map.Entry<String, CdkTypeReward> entry : typeRewardMap.entrySet()) {
+			if (entry.getValue().getGame().equals(game)) {
+				typeRewardsInfos.put(entry.getValue().getType(), entry.getValue());
+			}
+		}
+		return typeRewardsInfos;
+	}
+	
 	/**
 	 * 删除一个CDK
 	 * 
@@ -330,19 +275,16 @@ public class CdkServices {
 	 */
 	public boolean delCdk(DelCdkParam param, List<String> delCdks) {
 		if (param.getCdks() != null && param.getCdks().size() > 0) {
-			MemCachedClient mc = obtainMC();
 			try {
 				for (String cdk : param.getCdks()) {
 					String key = String.format(MC_CDK_DATA_FMT, cdk);
-					if (mc.delete(key)) {
+					if (memCachedClient.delete(key)) {
 						delCdks.add(cdk);
 						logMsg("Delete Cdk: " + cdk + ", Time: " + HawkTime.getTimeString());
 					}
 				}
 			} catch (Exception e) {
 				HawkException.catchException(e);
-			} finally {
-				givebackMC(mc);
 			}
 			return true;
 		}
@@ -363,22 +305,62 @@ public class CdkServices {
 			}
 
 			CdkTypeReward typeReward = typeRewardMap.remove(gameType);
-			MemCachedClient mc = obtainMC();
 			try {
 				String typeRewardInfos = CdkUtil.typeRewardsToString(typeRewardMap);
-				if (mc.set(MC_CDK_TYPES_KEY, typeRewardInfos)) {
+				if (memCachedClient.setString(MC_CDK_TYPES_KEY, typeRewardInfos)) {
 					logMsg("Delete TypeReward: " + typeReward.toString() + ", Time: " + HawkTime.getTimeString());
 					return true;
 				}
 			} catch (Exception e) {
 				HawkException.catchException(e);
-			} finally {
-				givebackMC(mc);
 			}
 		}
 		return false;
 	}
 
+	/**
+	 * 生成cdk序列号
+	 * @param game
+	 * @param type
+	 * @return
+	 */
+	private String genCdkSerial(String game, String type) throws Exception {
+		// 填充名字
+		char[] cdkPrefix = new char[HawkCdkService.CDK_NAMT_TYPE_LEN];
+		fillGameAndType(game, type, cdkPrefix);
+
+		char[] cdkRandom = new char[HawkCdkService.CDK_TOTAL_LENGTH - HawkCdkService.CDK_NAMT_TYPE_LEN];
+		// 随机数字
+		for (int j = 0; j < HawkCdkService.CDK_DIGIT_MIN_COUNT; j++) {
+			cdkRandom[j] = VALID_CDK_KEYS.charAt(HawkRand.randInt(0, 9));
+		}
+
+		// 随机字符
+		for (int j = 0; j < HawkCdkService.CDK_CHAR_MIN_COUNT; j++) {
+			cdkRandom[j + HawkCdkService.CDK_DIGIT_MIN_COUNT] = VALID_CDK_KEYS.charAt(HawkRand.randInt(10, VALID_CDK_KEYS.length() - 1));
+		}
+
+		int fixCount = HawkCdkService.CDK_DIGIT_MIN_COUNT + HawkCdkService.CDK_CHAR_MIN_COUNT;
+		int randCount = HawkCdkService.CDK_TOTAL_LENGTH - HawkCdkService.CDK_NAMT_TYPE_LEN - fixCount;
+		for (int j = 0; j < randCount; j++) {
+			cdkRandom[j + fixCount] = VALID_CDK_KEYS.charAt(HawkRand.randInt(0, VALID_CDK_KEYS.length() - 1));
+		}
+
+		// 数字字符乱序
+		for (int j = 0; j < HawkCdkService.CDK_DIGIT_MIN_COUNT + HawkCdkService.CDK_CHAR_MIN_COUNT; j++) {
+			int r = HawkRand.randInt(0, HawkCdkService.CDK_DIGIT_MIN_COUNT + HawkCdkService.CDK_CHAR_MIN_COUNT - 1);
+			if (r != j) {
+				char curChar = cdkRandom[j];
+				cdkRandom[j] = cdkRandom[r];
+				cdkRandom[r] = curChar;
+			}
+		}
+
+		// 生成数据库信息
+		String cdkSerial = String.valueOf(cdkPrefix) + String.valueOf(cdkRandom);
+		return cdkSerial;
+	}
+	
 	/**
 	 * 生成CDK
 	 * 
@@ -397,15 +379,20 @@ public class CdkServices {
 
 		// 添加cdk类型奖励失败, 已存在
 		if (!addCdkTypeReward(typeReward)) {
-			return CDK_TYPE_EXIST;
+			return HawkCdkService.CDK_TYPE_EXIST;
 		}
 
-		String filePath = String.format("%s/cdks/%s-%s-%s-%s.txt", System.getProperty("user.dir"), param.getGame(), param.getType(), param.getStarttime(), param.getEndtime());
-
-		if (param.getPlatform().length() > 0) {
-			filePath = String.format("%s/cdks/%s-%s-%s-%s-%s.txt", System.getProperty("user.dir"), param.getGame(), param.getPlatform(), param.getType(), param.getStarttime(), param.getEndtime());
+		// 创建目录
+		try {
+			File cdksFolder = new File(System.getProperty("user.dir") + "/cdks/");
+			if(!cdksFolder.exists()) {
+				cdksFolder.mkdir();
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
 		}
-
+		
+		String filePath = String.format("%s/cdks/%s-%s.txt", System.getProperty("user.dir"), param.getGame(), param.getType());
 		FileWriter fileWrite = null;
 		BufferedWriter bufferedWriter = null;
 		try {
@@ -417,50 +404,18 @@ public class CdkServices {
 			HawkException.catchException(e);
 		}
 
-		MemCachedClient mc = obtainMC();
 		try {
 			// 生成cdk
 			int genCount = 0;
 			while (genCount < param.getCount()) {
-				// 填充名字
-				char[] cdkPrefix = new char[CDK_NAMT_TYPE_LEN];
-				fillGameAndType(param.getGame(), param.getType(), cdkPrefix);
-
-				char[] cdkRandom = new char[CDK_TOTAL_LENGTH - CDK_NAMT_TYPE_LEN];
-				// 随机数字
-				for (int j = 0; j < CDK_DIGIT_MIN_COUNT; j++) {
-					cdkRandom[j] = VALID_CDK_KEYS.charAt(HawkRand.randInt(0, 9));
-				}
-
-				// 随机字符
-				for (int j = 0; j < CDK_CHAR_MIN_COUNT; j++) {
-					cdkRandom[j + CDK_DIGIT_MIN_COUNT] = VALID_CDK_KEYS.charAt(HawkRand.randInt(10, VALID_CDK_KEYS.length() - 1));
-				}
-
-				int fixCount = CDK_DIGIT_MIN_COUNT + CDK_CHAR_MIN_COUNT;
-				int randCount = CDK_TOTAL_LENGTH - CDK_NAMT_TYPE_LEN - fixCount;
-				for (int j = 0; j < randCount; j++) {
-					cdkRandom[j + fixCount] = VALID_CDK_KEYS.charAt(HawkRand.randInt(0, VALID_CDK_KEYS.length() - 1));
-				}
-
-				// 数字字符乱序
-				for (int j = 0; j < CDK_DIGIT_MIN_COUNT + CDK_CHAR_MIN_COUNT; j++) {
-					int r = HawkRand.randInt(0, CDK_DIGIT_MIN_COUNT + CDK_CHAR_MIN_COUNT - 1);
-					if (r != j) {
-						char curChar = cdkRandom[j];
-						cdkRandom[j] = cdkRandom[r];
-						cdkRandom[r] = curChar;
-					}
-				}
-
 				// 生成数据库信息
-				String cdkSerial = String.valueOf(cdkPrefix) + String.valueOf(cdkRandom);
+				String cdkSerial = genCdkSerial(param.getGame(), param.getType());
 				CdkInfo info = new CdkInfo();
 				info.setCdk(cdkSerial);
 
 				// 写入数据库
 				String key = String.format(MC_CDK_DATA_FMT, cdkSerial);
-				if (mc.add(key, info.toString())) {
+				if (memCachedClient.setString(key, info.toString())) {
 					genCdks.add(cdkSerial);
 					genCount++;
 
@@ -483,10 +438,8 @@ public class CdkServices {
 			} catch (IOException e) {
 				HawkException.catchException(e);
 			}
-
-			givebackMC(mc);
 		}
-		return CDK_STATUS_OK;
+		return HawkCdkService.CDK_STATUS_OK;
 	}
 
 	/**
@@ -501,15 +454,10 @@ public class CdkServices {
 
 		// 追加cdk失败, 不存在
 		if (typeReward == null) {
-			return CDK_TYPE_NONEXIST;
+			return HawkCdkService.CDK_TYPE_NONEXIST;
 		}
 
-		String filePath = String.format("%s/cdks/%s-%s-%s-%s.txt", System.getProperty("user.dir"), typeReward.getGame(), typeReward.getType(), typeReward.getStarttime(), typeReward.getEndtime());
-
-		if (typeReward.getPlatform().length() > 0) {
-			filePath = String.format("%s/cdks/%s-%s-%s-%s-%s.txt", System.getProperty("user.dir"), typeReward.getGame(), typeReward.getPlatform(), typeReward.getType(), typeReward.getStarttime(), typeReward.getEndtime());
-		}
-
+		String filePath = String.format("%s/cdks/%s-%s.txt", System.getProperty("user.dir"), typeReward.getGame(), typeReward.getType());
 		FileWriter fileWrite = null;
 		BufferedWriter bufferedWriter = null;
 		try {
@@ -523,50 +471,18 @@ public class CdkServices {
 			HawkException.catchException(e);
 		}
 
-		MemCachedClient mc = obtainMC();
 		try {
 			// 生成cdk
 			int genCount = 0;
 			while (genCount < param.getCount()) {
-				// 填充名字
-				char[] cdkPrefix = new char[CDK_NAMT_TYPE_LEN];
-				fillGameAndType(param.getGame(), param.getType(), cdkPrefix);
-
-				char[] cdkRandom = new char[CDK_TOTAL_LENGTH - CDK_NAMT_TYPE_LEN];
-				// 随机数字
-				for (int j = 0; j < CDK_DIGIT_MIN_COUNT; j++) {
-					cdkRandom[j] = VALID_CDK_KEYS.charAt(HawkRand.randInt(0, 9));
-				}
-
-				// 随机字符
-				for (int j = 0; j < CDK_CHAR_MIN_COUNT; j++) {
-					cdkRandom[j + CDK_DIGIT_MIN_COUNT] = VALID_CDK_KEYS.charAt(HawkRand.randInt(10, VALID_CDK_KEYS.length() - 1));
-				}
-
-				int fixCount = CDK_DIGIT_MIN_COUNT + CDK_CHAR_MIN_COUNT;
-				int randCount = CDK_TOTAL_LENGTH - CDK_NAMT_TYPE_LEN - fixCount;
-				for (int j = 0; j < randCount; j++) {
-					cdkRandom[j + fixCount] = VALID_CDK_KEYS.charAt(HawkRand.randInt(0, VALID_CDK_KEYS.length() - 1));
-				}
-
-				// 数字字符乱序
-				for (int j = 0; j < CDK_DIGIT_MIN_COUNT + CDK_CHAR_MIN_COUNT; j++) {
-					int r = HawkRand.randInt(0, CDK_DIGIT_MIN_COUNT + CDK_CHAR_MIN_COUNT - 1);
-					if (r != j) {
-						char curChar = cdkRandom[j];
-						cdkRandom[j] = cdkRandom[r];
-						cdkRandom[r] = curChar;
-					}
-				}
-
 				// 生成数据库信息
-				String cdkSerial = String.valueOf(cdkPrefix) + String.valueOf(cdkRandom);
+				String cdkSerial = genCdkSerial(param.getGame(), param.getType());
 				CdkInfo info = new CdkInfo();
 				info.setCdk(cdkSerial);
 
 				// 写入数据库
 				String key = String.format(MC_CDK_DATA_FMT, cdkSerial);
-				if (mc.add(key, info.toString())) {
+				if (memCachedClient.setString(key, info.toString())) {
 					genCdks.add(cdkSerial);
 					genCount++;
 
@@ -589,10 +505,8 @@ public class CdkServices {
 			} catch (IOException e) {
 				HawkException.catchException(e);
 			}
-
-			givebackMC(mc);
 		}
-		return CDK_STATUS_OK;
+		return HawkCdkService.CDK_STATUS_OK;
 	}
 
 	/**
@@ -649,16 +563,13 @@ public class CdkServices {
 			if (hasChanged) {
 				typeRewardMap.put(typeReward.getCdkGameType(), typeReward);
 
-				MemCachedClient mc = obtainMC();
 				try {
 					String typeRewardInfos = CdkUtil.typeRewardsToString(typeRewardMap);
-					if (mc.set(MC_CDK_TYPES_KEY, typeRewardInfos)) {
+					if (memCachedClient.setString(MC_CDK_TYPES_KEY, typeRewardInfos)) {
 						logMsg("Reset TypeReward: " + typeReward.toString() + ", Time: " + HawkTime.getTimeString());
 					}
 				} catch (Exception e) {
 					HawkException.catchException(e);
-				} finally {
-					givebackMC(mc);
 				}
 			}
 		}
@@ -682,23 +593,20 @@ public class CdkServices {
 			return null;
 		}
 
-		MemCachedClient mc = obtainMC();
 		try {
 			String key = String.format(MC_CDK_DATA_FMT, param.getCdk());
-			Object cdkObj = mc.get(key);
-			if (cdkObj == null) {
+			String cdk = memCachedClient.getString(key);
+			if (cdk == null) {
 				return null;
 			}
 
 			CdkInfo cdkInfo = new CdkInfo();
-			if (!cdkInfo.parse((String) cdkObj)) {
+			if (!cdkInfo.parse(cdk)) {
 				return null;
 			}
 			return cdkInfo;
 		} catch (Exception e) {
 			HawkException.catchException(e);
-		} finally {
-			givebackMC(mc);
 		}
 		return null;
 	}
@@ -710,8 +618,8 @@ public class CdkServices {
 	 * @return
 	 */
 	public int useCdk(UseCdkParam param) {
-		if (param.getCdk().length() != CDK_TOTAL_LENGTH) {
-			return CDK_STATUS_NONEXIST;
+		if (param.getCdk().length() != HawkCdkService.CDK_TOTAL_LENGTH) {
+			return HawkCdkService.CDK_STATUS_NONEXIST;
 		}
 
 		String game = getGameNameFromCdk(param.getCdk());
@@ -720,62 +628,66 @@ public class CdkServices {
 		// 不存在
 		String gameType = game + "." + type;
 		CdkTypeReward typeReward = typeRewardMap.get(gameType);
-		if (typeReward == null && checkCdkValid(game, type, param.getCdk())) {
-			return CDK_STATUS_NONEXIST;
+		if (typeReward == null || !checkCdkValid(game, type, param.getCdk())) {
+			return HawkCdkService.CDK_STATUS_NONEXIST;
 		}
 
-		// 平台校验(除了ios91的没有前缀,其他都有)
+		// 平台校验
 		String puid = param.getPuid();
-		if (puid.indexOf('_') < 0) {
-			puid = "91_" + param.getPuid();
-		}
-
 		String platform = typeReward.getPlatform();
-		if (platform != null && platform.length() > 0 && !"null".equals(platform) && !puid.startsWith(platform)) {
-			return CDK_STATUS_PLAT;
+		if (platform != null && platform.length() > 0 && !"null".equals(platform)) {
+			boolean platformValid = false;
+			String items[] = platform.split(",");
+			for (String pf : items) {
+				if (puid.startsWith(pf)) {
+					platformValid = true;
+					break;
+				}
+			}
+			
+			if (!platformValid) {
+				return HawkCdkService.CDK_STATUS_PLAT;
+			}
 		}
 
 		if (typeReward.isInFuture()) {
-			return CDK_STATUS_FUTURE;
+			return HawkCdkService.CDK_STATUS_FUTURE;
 		}
 
 		if (typeReward.isTimeout()) {
-			return CDK_STATUS_PAST;
+			return HawkCdkService.CDK_STATUS_PAST;
 		}
 
-		MemCachedClient mc = obtainMC();
 		try {
 			String key = String.format(MC_CDK_DATA_FMT, param.getCdk());
-			Object cdkObj = mc.get(key);
-			if (cdkObj == null) {
-				return CDK_STATUS_NONEXIST;
+			String cdk = memCachedClient.getString(key);
+			if (cdk == null) {
+				return HawkCdkService.CDK_STATUS_NONEXIST;
 			}
 
 			CdkInfo cdkInfo = new CdkInfo();
-			if (!cdkInfo.parse((String) cdkObj)) {
+			if (!cdkInfo.parse(cdk)) {
 				logMsg("Cdk Format Error: " + cdkInfo.toString());
-				return CDK_STATUS_NONEXIST;
+				return HawkCdkService.CDK_STATUS_NONEXIST;
 			}
 
 			if (cdkInfo.isBeused()) {
 				logMsg("Cdk Been Used: " + cdkInfo.toString());
-				return CDK_STATUS_USED;
+				return HawkCdkService.CDK_STATUS_USED;
 			}
 
 			cdkInfo.setUsed(param.getGame(), param.getPlatform(), param.getServer(), param.getPlayerid(), param.getPlayername(), typeReward.getReward());
-			if (mc.set(key, cdkInfo.toString())) {
+			if (memCachedClient.setString(key, cdkInfo.toString())) {
 				logMsg("Use Cdk: " + cdkInfo.toString() + ", Time: " + HawkTime.getTimeString());
 			}
 
 			param.setReward(typeReward.getReward());
-			return CDK_STATUS_OK;
+			return HawkCdkService.CDK_STATUS_OK;
 
 		} catch (Exception e) {
 			HawkException.catchException(e);
-		} finally {
-			givebackMC(mc);
 		}
-		return CDK_STATUS_NONEXIST;
+		return HawkCdkService.CDK_STATUS_NONEXIST;
 	}
 
 	/**
@@ -785,16 +697,13 @@ public class CdkServices {
 		// 每120s通信一次, 避免cmem的180s超时
 		int currentTime = (int) (Math.floor(System.currentTimeMillis() / 1000));
 		if (currentTime - lastVisitTime >= 120000) {
-			MemCachedClient mc = obtainMC();
 			try {
-				Object cdkObj = mc.get(MC_CDK_AUTHOR_KEY);
-				if (cdkObj == null) {
-					mc.add(MC_CDK_AUTHOR_KEY, "hawk");
+				String author = memCachedClient.getString(MC_CDK_AUTHOR_KEY);
+				if (author == null) {
+					memCachedClient.setString(MC_CDK_AUTHOR_KEY, "hawk");
 				}
 			} catch (Exception e) {
 				HawkException.catchException(e);
-			} finally {
-				givebackMC(mc);
 			}
 		}
 		return running;

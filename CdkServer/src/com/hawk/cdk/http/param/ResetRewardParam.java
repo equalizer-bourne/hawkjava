@@ -3,8 +3,7 @@ package com.hawk.cdk.http.param;
 import java.util.Map;
 
 import org.hawk.os.HawkException;
-
-import com.hawk.cdk.CdkServices;
+import org.hawk.util.services.HawkCdkService;
 
 /**
  * cdk类型奖励重置
@@ -21,27 +20,27 @@ public class ResetRewardParam {
 
 	public void toLowerCase() {
 		if (game != null) {
-			game.toLowerCase();
+			game = game.toLowerCase();
 		}
 		
 		if (platform != null) {
-			platform.toLowerCase();
+			platform = platform.toLowerCase();
 		}
 		
 		if (type != null) {
-			type.toLowerCase();
+			type = type.toLowerCase();
 		}
 		
 		if (reward != null) {
-			reward.toLowerCase();
+			reward = reward.toLowerCase();
 		}
 		
 		if (starttime != null) {
-			starttime.toLowerCase();
+			starttime = starttime.toLowerCase();
 		}
 		
 		if (endtime != null) {
-			endtime.toLowerCase();
+			endtime = endtime.toLowerCase();
 		}
 	}
 	
@@ -98,12 +97,12 @@ public class ResetRewardParam {
 			game = params.get("game");
 			type = params.get("type");
 			
-			if (game.length() > CdkServices.CDK_HEADER_SIZE) {
-				game = game.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (game.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				game = game.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 			
-			if (type.length() > CdkServices.CDK_HEADER_SIZE) {
-				type = type.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (type.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				type = type.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 			
 			if (params.containsKey("platform")) {

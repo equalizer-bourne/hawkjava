@@ -4,10 +4,15 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import org.hawk.util.services.HawkCdkService;
+
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import com.hawk.cdk.Cdk;
 import com.hawk.cdk.CdkServices;
 import com.hawk.cdk.data.CdkTypeReward;
 import com.hawk.cdk.http.CdkHttpServer;
@@ -22,11 +27,13 @@ public class AppendCdkHandler implements HttpHandler {
 
 	@Override
 	public void handle(HttpExchange httpExchange) throws IOException {
-		int status = CdkServices.CDK_PARAM_ERROR;
+		int status = HawkCdkService.CDK_PARAM_ERROR;
 		JSONObject jsonObject = new JSONObject();
 		List<String> genCdks = new LinkedList<String>();
 
 		Map<String, String> params = CdkHttpServer.parseHttpParam(httpExchange);
+		Cdk.checkToken(params.get("token"));
+
 		AppendCdkParam cdkparam = new AppendCdkParam();
 		if (cdkparam.initParam(params)) {
 			cdkparam.toLowerCase();
@@ -34,7 +41,7 @@ public class AppendCdkHandler implements HttpHandler {
 		}
 
 		jsonObject.put("status", String.valueOf(status));
-		if (status == CdkServices.CDK_STATUS_OK) {
+		if (status == HawkCdkService.CDK_STATUS_OK) {
 			JSONArray jsonArray = new JSONArray();
 			for (String cdk : genCdks) {
 				jsonArray.add(cdk);

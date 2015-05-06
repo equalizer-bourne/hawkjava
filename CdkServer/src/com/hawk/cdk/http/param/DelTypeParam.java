@@ -3,8 +3,7 @@ package com.hawk.cdk.http.param;
 import java.util.Map;
 
 import org.hawk.os.HawkException;
-
-import com.hawk.cdk.CdkServices;
+import org.hawk.util.services.HawkCdkService;
 
 /**
  * cdk删除类型参数
@@ -17,11 +16,11 @@ public class DelTypeParam {
 
 	public void toLowerCase() {
 		if (game != null) {
-			game.toLowerCase();
+			game = game.toLowerCase();
 		}
 
 		if (type != null) {
-			type.toLowerCase();
+			type = type.toLowerCase();
 		}
 	}
 
@@ -46,12 +45,12 @@ public class DelTypeParam {
 			game = params.get("game");
 			type = params.get("type");
 
-			if (game.length() > CdkServices.CDK_HEADER_SIZE) {
-				game = game.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (game.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				game = game.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 
-			if (type.length() > CdkServices.CDK_HEADER_SIZE) {
-				type = type.substring(0, CdkServices.CDK_HEADER_SIZE);
+			if (type.length() > HawkCdkService.CDK_HEADER_SIZE) {
+				type = type.substring(0, HawkCdkService.CDK_HEADER_SIZE);
 			}
 
 		} catch (Exception e) {
