@@ -1,0 +1,22 @@
+option java_package = "com.hawk.game.protocol";
+
+// 聊天类型
+enum chatType 
+{
+	// 世界聊天
+	CHAT_WORLD = 1;
+	// 聊天广播
+	CHAT_BROADCAST = 2;
+	// 世界广播
+	WORLD_BROADCAST = 3;
+}
+
+// 被踢下线原因
+enum kickReason
+{	
+	DUPLICATE_LOGIN = 1;
+	SERVER_SHUTDOWN = 2;
+	LOGIN_FORBIDEN = 3;
+	KICKED_OUT = 4;
+	SERVER_RESTART = 5;
+}

@@ -1,0 +1,14 @@
+option java_package = "com.hawk.game.protocol";
+
+message HPSendChat
+{
+	required string chatMsg = 1;
+}
+
+message HPPushChat
+{
+	required int32 type = 1;
+	required int32 playerId = 2;
+	required string name = 3;
+	required string chatMsg = 4;
+}

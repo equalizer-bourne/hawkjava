@@ -1,0 +1,6 @@
+option java_package = "com.hawk.game.protocol";
+
+message HPPlayerKickout
+{
+	required int32 reason = 1;	
+}

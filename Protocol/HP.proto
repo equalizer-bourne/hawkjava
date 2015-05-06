@@ -1,0 +1,22 @@
+option java_package = "com.hawk.game.protocol";
+
+// 系统协议ID列表(<100)
+enum sys
+{
+	// 数据封装
+	DATA_WRAPPER = 1;
+	// 秘钥交换
+	KEY_EXCHANGE = 2;
+	// 心跳通知
+	HEART_BEAT = 3;	
+	// 错误码提示
+	ERROR_CODE = 4;	
+}
+
+// 游戏协议ID列表(>=100)
+enum code
+{
+	// 登陆
+	LOGIN_C = 1000;
+	LOGIN_S = 1001;
+}

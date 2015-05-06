@@ -1,26 +1,25 @@
 option java_package = "com.hawk.game.protocol";
 
-// 协议ID定义列表
-enum PID
-{
-	// 数据封装
-	DATA_WRAPPER = 1;
-	// 秘钥交换
-	KEY_EXCHANGE = 2;	
-};
-
-message DataWarpper
+message HPDataWarpper
 {
 	optional bytes data = 1;
 }
  
-message KeyExchange
+message HPKeyExchange
 {
-	optional bytes keys = 1;	
+	optional bytes keys = 1;
 }
 
-message HeartBeat
+message HPHeartBeat
 {
-	optional int timeStamp = 1;
+	optional int32 timeStamp = 1;
 	optional bytes data = 2;
+}
+
+message HPErrorCode
+{
+	required int32  hpCode = 1;	
+	required int32  errCode = 2;
+	optional string errMsg = 3;
+	optional int32  errFlag = 4 [default = 0];
 }

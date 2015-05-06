@@ -1,0 +1,25 @@
+option java_package = "com.hawk.game.protocol";
+
+message HPLogin
+{
+	required string puid = 1;
+	optional string deviceId = 2 [default = "0"];
+	optional string platform = 3 [default = "0"];
+	optional string version = 4 [default = "0.0.1"];
+	optional string token = 5;
+}
+ 
+message HPLoginRet
+{
+	required int32 status = 1;
+	optional int32 playerId = 2;
+	optional int32 roleItemId = 3;
+	optional int32 timeStamp = 4;
+}
+
+message HPUserKickout
+{
+	required int32 playerId = 1;
+	optional int32 reason = 2;	
+}
+

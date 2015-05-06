@@ -1,0 +1,13 @@
+option java_package = "com.hawk.game.protocol";
+
+enum error
+{
+	// 配置文件错误
+	CONFIG_ERROR = 1;
+	// 在线人数达到上限
+	ONLINE_MAX_LIMIT = 2;
+	// 注册人数达到上限
+	REGISTER_MAX_LIMIT = 3;
+	// 服务器灰度状态中
+	SERVER_GRAY_STATE = 4;
+}
