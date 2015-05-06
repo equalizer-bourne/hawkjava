@@ -1,30 +1,29 @@
-﻿/*
-Navicat MySQL Data Transfer
-
-Source Server         : 本地mysql
-Source Server Version : 50525
-Source Host           : localhost:3306
-Source Database       : game
-
-Target Server Type    : MYSQL
-Target Server Version : 50525
-File Encoding         : 65001
-
-Date: 2014-06-24 17:58:12
-*/
-
-SET FOREIGN_KEY_CHECKS=0;
-
--- ----------------------------
--- Table structure for `player`
--- ----------------------------
 DROP TABLE IF EXISTS `player`;
 CREATE TABLE `player` (
-  `id` varchar(128) NOT NULL DEFAULT '0',
-  `level` int(11) DEFAULT NULL,
-  `name` varchar(2048) DEFAULT NULL,
-  `updateTime` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  `invalid` int(11) unsigned zerofill DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `puid` varchar(256) NOT NULL,
+  `name` varchar(256) NOT NULL,
+  `level` int(11) NOT NULL DEFAULT '0',
+  `exp` int(11) NOT NULL DEFAULT '0',  
+  `gold` int(11) NOT NULL DEFAULT '0',
+  `coin` bigint NOT NULL DEFAULT '0',
+  `recharge` int(11) NOT NULL DEFAULT '0',
+  `vipLevel` int(11) NOT NULL DEFAULT '0',
+  `device` varchar(256) NOT NULL DEFAULT '',
+  `platform` varchar(256) NOT NULL DEFAULT '',
+  `phoneInfo` varchar(256) NOT NULL DEFAULT '',
+  `forbidenTime` timestamp NULL DEFAULT NULL,
+  `silentTime` timestamp NULL DEFAULT NULL,
+  `loginTime` timestamp NULL DEFAULT NULL,
+  `logoutTime` timestamp NULL DEFAULT NULL,  
+  `resetTime` timestamp NULL DEFAULT NULL, 
+  `createTime` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `updateTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `invalid` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY (`puid`),
+  KEY `puid_index` (`puid`) USING BTREE,
+  KEY `name_index` (`name`) USING BTREE,
+  KEY `device_index` (`device`) USING BTREE,
+  KEY `platform_index` (`platform`) USING BTREE
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_bin;

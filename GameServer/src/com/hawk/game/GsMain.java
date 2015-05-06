@@ -22,7 +22,7 @@ public class GsMain {
 			if (app.init("cfg/gs.cfg")) {
 				app.run();
 			}
-			
+
 			// 退出
 			HawkLog.logPrintln("gameserver exit");
 			System.exit(0);

@@ -12,10 +12,10 @@ public class GsConst {
 	 * @author hawk
 	 */
 	public static class ObjType {
-		// 应用程序
-		public static int MANAGER = 1;
 		// 玩家对象
-		public static int PLAYER = 2;
+		public static int PLAYER = 1;
+		// 应用程序
+		public static int MANAGER = 100;
 	}
 
 	/**
@@ -25,17 +25,19 @@ public class GsConst {
 	 */
 	public static class ObjId {
 		// 应用程序
-		public static int APP = 1;
+		public static int APP = 100;
 	}
 
 	/**
 	 * 消息定义
 	 */
 	public static class MsgType {
-		// 删除对象
-		public static int DELETE_OBJ = 1;
 		// 连接断开
 		public static int SESSION_CLOSED = 2;
+		// 玩家上线
+		public static int PLAYER_LOGIN = 3;
+		// 玩家初始化完成
+		public static int PLAYER_ASSEMBLE = 4;
 	}
 
 	/**
@@ -46,5 +48,8 @@ public class GsConst {
 	public static class ModuleType {
 		// 登陆模块
 		public static int LOGIN_MODULE = 1;
+		
+		// 空闲模块(保证在最后)
+		public static int IDLE_MODULE = 100;
 	}
 }

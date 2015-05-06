@@ -1,2 +1,5 @@
 <script httpAddr="0.0.0.0:5132" whiteIptables="true" baseSrcDir="${app}/script" baseOutDir="${app}/script/bin">
+	<item id="xmlcheck" 		className="com.hawk.game.gm.XmlReloadHandler"/>
+	<item id="sysop" 			className="com.hawk.game.gm.SysOperationHandler"/>
+	<item id="onshutdown" 		className="com.hawk.game.gm.ShutdownCallbackHandler"/>
 </script>

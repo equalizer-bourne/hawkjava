@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="script"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/HawkUtil"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/ServerProto"/>
 	<classpathentry kind="lib" path="/HawkUtil/lib/protobuf-java-2.5.0.jar" sourcepath="/Package/jars/protobuf-2.5.0.zip"/>
@@ -10,8 +11,11 @@
 	<classpathentry kind="lib" path="/HawkUtil/lib/hibernate3.jar"/>
 	<classpathentry kind="lib" path="/HawkUtil/lib/javassist-3.12.0.GA.jar"/>
 	<classpathentry kind="lib" path="/HawkUtil/lib/jta-1.1.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.7"/>
-	<classpathentry kind="lib" path="/HawkUtil/lib/httpclient-4.3.4.jar"/>
-	<classpathentry kind="lib" path="/HawkUtil/lib/httpcore-4.3.2.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jre7"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/json-lib-2.4-jdk15.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/log4j-1.2.17.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/slf4j-api-1.7.6.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/slf4j-log4j12-1.7.6.jar"/>
+	<classpathentry kind="lib" path="/HawkUtil/lib/commons-httpclient-3.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
