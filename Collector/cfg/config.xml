@@ -2,13 +2,20 @@
 <config>
 	<httpserver>
 		<addr>0.0.0.0</addr>
-		<port>9010</port>
+		<port>9001</port>
 		<pool>4</pool>
+		<token></token>
 	</httpserver>
 	
-	<hibernate>
-		<connUrl>jdbc:mysql://127.0.0.1:3306/collector?useUnicode=true&amp;characterEncoding=UTF-8</connUrl>
+	<zmqserver>
+		<addr>tcp://0.0.0.0:9901</addr>
+		<pool>8</pool>
+	</zmqserver>
+	
+	<database>
+		<dbHost>127.0.0.1:3306</dbHost>
 		<userName>root</userName>
-		<passWord>youai@701</passWord>
-	</hibernate>
+		<passWord>123456</passWord>
+		<threads>8</threads>
+	</database>	
 </config>

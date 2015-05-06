@@ -11,19 +11,23 @@ import org.hawk.os.HawkOSOperator;
  */
 public class Collector {
 	/**
-	 * 当前用户路径
+	 * 系统token校验
 	 */
-	static String userDir;
-
-	/**
-	 * 获取用户路径
-	 * 
-	 * @return
-	 */
-	public static String getUserDir() {
-		return userDir;
+	private static String httpToken = "";
+	
+	public static void setToken(String token) {
+		httpToken = token.trim();
 	}
-
+	
+	public static boolean checkToken(String token) {
+		if (httpToken != null && httpToken.length() > 0) {
+			if (token == null || !token.equals(httpToken)) {
+				throw new RuntimeException("http token check failed.");
+			}
+		}
+		return true;
+	}
+	
 	/**
 	 * 主函数
 	 * 
@@ -36,12 +40,9 @@ public class Collector {
 
 			// 打印系统信息
 			HawkOSOperator.printOsEnv();
-
-			// 用户路径
-			userDir = System.getProperty("user.dir");
-
+			
 			// 创建并初始化服务
-			if (CollectorServices.getInstance().init(userDir + "/cfg/collector.cfg")) {
+			if (CollectorServices.getInstance().init(System.getProperty("user.dir") + "/cfg/config.xml")) {
 				// 启动服务器
 				CollectorServices.getInstance().run();
 

@@ -1,13 +1,17 @@
 ﻿package com.hawk.collector.db;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.hawk.db.mysql.HawkMysqlSession;
+import org.hawk.log.HawkLog;
 import org.hawk.os.HawkException;
-import org.hawk.os.HawkTime;
-import org.hawk.util.HawkTickable;
 
 import com.hawk.collector.CollectorServices;
 
@@ -16,31 +20,28 @@ import com.hawk.collector.CollectorServices;
  * 
  * @author hawk
  */
-public class DBManager extends HawkTickable {
+public class DBManager {
 	/**
 	 * 数据库主机地址
 	 */
-	String dbHost;
+	private String dbHost;
 	/**
 	 * 数据库用户名
 	 */
-	String dbUser;
+	private String dbUser;
 	/**
 	 * 数据库登陆密码
 	 */
-	String dbPwd;
+	private String dbPwd;
 	/**
-	 * 上次保活时间
+	 * 连接池大小
 	 */
-	long lastHeartBeat = 0;
+	private int poolSize;
 	/**
-	 * 数据库连接
+	 * 数据库会话表
 	 */
-	Connection dbConnection = null;
-	/**
-	 * 保持连接
-	 */
-	Statement dbStatement = null;
+	Map<String, HawkMysqlSession> dbSessions;
+
 	/**
 	 * 数据库管理器单例对象
 	 */
@@ -62,7 +63,8 @@ public class DBManager extends HawkTickable {
 	 * 函数
 	 */
 	private DBManager() {
-		CollectorServices.getInstance().addTickable(this);
+		poolSize = 1;
+		dbSessions = new ConcurrentHashMap<String, HawkMysqlSession>();
 	}
 
 	/**
@@ -73,19 +75,11 @@ public class DBManager extends HawkTickable {
 	 * @param dbPwd
 	 * @return
 	 */
-	public boolean init(String dbHost, String dbUser, String dbPwd) {
+	public boolean init(String dbHost, String dbUser, String dbPwd, int poolSize) {
 		this.dbHost = dbHost;
 		this.dbUser = dbUser;
 		this.dbPwd = dbPwd;
-		return doConnect();
-	}
-
-	/**
-	 * 进行连接
-	 * 
-	 * @return
-	 */
-	private boolean doConnect() {
+		this.poolSize = Math.max(1, poolSize);
 		try {
 			// 加载驱动程序
 			try {
@@ -94,24 +88,57 @@ public class DBManager extends HawkTickable {
 				HawkException.catchException(e);
 				return false;
 			}
-
-			dbConnection = DriverManager.getConnection(dbHost, dbUser, dbPwd);
-			dbStatement = dbConnection.prepareStatement("");
-			lastHeartBeat = HawkTime.getMillisecond();
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			HawkException.catchException(e);
 			return false;
 		}
-		return dbConnection != null;
+		return true;
 	}
 
 	/**
-	 * 获取数据库连接
+	 * 获取db的url地址
+	 * 
+	 * @param dbName
+	 * @return
+	 */
+	public String getDbUrl(String dbName) {
+		return String.format("jdbc:mysql://%s/%s?useUnicode=true&amp;characterEncoding=UTF-8", dbHost, dbName);
+	}
+	
+	/**
+	 * 获取数据库会话
+	 * 
+	 * @param dbName
+	 * @return
+	 */
+	public HawkMysqlSession getDbSession(String dbName) {
+		return dbSessions.get(dbName);
+	}
+	
+	/**
+	 * 进行连接
 	 * 
 	 * @return
 	 */
-	public Connection getConnection() {
-		return dbConnection;
+	public HawkMysqlSession createDbSession(String dbName) {
+		try {
+			HawkMysqlSession session = new HawkMysqlSession();
+			if (session.init(getDbUrl(dbName), dbUser, dbPwd, poolSize)) {
+				dbSessions.put(dbName, session);
+				CollectorServices.getInstance().addTickable(session);
+				
+				HawkLog.logPrintln(String.format("create dbsession success, dbHost: %s, dbUser: %s, dbPwd: %s, poolSize: %d", 
+						getDbUrl(dbName), dbUser, dbPwd, poolSize));
+				
+				return session;
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		
+		HawkLog.logPrintln(String.format("create dbsession failed, dbHost: %s, dbUser: %s, dbPwd: %s, poolSize: %d", 
+				getDbUrl(dbName), dbUser, dbPwd, poolSize));
+		return null;
 	}
 
 	/**
@@ -119,46 +146,98 @@ public class DBManager extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public Statement createStatement() {
-		Statement statement = null;
-		try {
-			statement = dbConnection.prepareStatement("");
-		} catch (SQLException e) {
-			HawkException.catchException(e);
+	public Statement createStatement(String dbName) {
+		HawkMysqlSession session = getDbSession(dbName);
+		if (session != null) {
+			return session.createStatement();
+		} else {
+			HawkLog.errPrintln("database session null: " + dbName);
 		}
-		return statement;
+		return null;
 	}
 
 	/**
 	 * 直接执行sql语句
 	 * 
+	 * @param dbName
 	 * @param sql
-	 * @return
+	 * @return 影响的行数
 	 * @throws SQLException
 	 */
-	public boolean executeSql(String sql) throws SQLException {
-		Statement statement = null;
-		try {
-			statement = DBManager.getInstance().createStatement();
-			statement.executeUpdate(sql);
-			return true;
-		} finally {
-			if (statement != null) {
-				statement.close();
-			}
+	public int executeSql(String dbName, String sql) {
+		HawkMysqlSession session = getDbSession(dbName);
+		if (session != null) {
+			return session.executeSql(sql);
+		} else {
+			HawkLog.errPrintln("database session null: " + dbName);
 		}
+		return 0;
 	}
 
-	@Override
-	public void onTick() {
-		try {
-			// mysql 连接保持活跃(30s)
-			if (HawkTime.getMillisecond() - lastHeartBeat >= 30000) {
-				dbStatement.execute("select 1;");
-				lastHeartBeat = HawkTime.getMillisecond();
-			}
-		} catch (Exception e) {
-			HawkException.catchException(e);
+	/**
+	 * 获取收集数据库的表结构
+	 * 
+	 * @return
+	 */
+	private String getCollectorDbSchema() {
+		StringBuffer stringBuffer = new StringBuffer(4096);
+		 try {
+             File file = new File(System.getProperty("user.dir") + "/db/collector.sql");
+             if(file.isFile() && file.exists()){
+                 InputStreamReader read = new InputStreamReader(new FileInputStream(file), "UTF8");
+                 BufferedReader bufferedReader = new BufferedReader(read);
+                 String line = null;
+                 while((line = bufferedReader.readLine()) != null) {
+                	 line = line.trim();
+                	 if (line.length() > 0) {
+                		 stringBuffer.append(line);
+                		 stringBuffer.append("\r\n");
+                	 }
+                 }
+                 read.close();
+                 return stringBuffer.toString();
+             }
+	     } catch (Exception e) {
+	         HawkException.catchException(e);
+	     }
+		return "";
+	}
+	
+	/**
+	 * 创建收集信息的对应数据库
+	 * 
+	 * @param string
+	 */
+	public boolean createCollectorDB(String dbName) {
+		String createDbSql = String.format("CREATE DATABASE %s DEFAULT CHARSET utf8 COLLATE utf8_general_ci", dbName);
+		if (executeSql("oods", createDbSql) > 0) {
+			HawkMysqlSession session = createDbSession(dbName);
+			if (session != null) {
+				Statement statement = null;
+				try {
+					statement = session.createStatement();
+					String sqls[] = getCollectorDbSchema().split(";");
+					for (String sql : sqls) {
+						sql = sql.trim();
+						if (sql.length() > 0) {
+							statement.addBatch(sql);
+						}
+					}
+					statement.executeBatch();
+					return true;
+				} catch (Exception e) {
+					HawkException.catchException(e);
+				} finally {
+					if (statement != null) {
+						try {
+							statement.close();
+						} catch (SQLException e) {
+							HawkException.catchException(e);
+						}
+					}
+				}
+			}			
 		}
+		return false;
 	}
 }

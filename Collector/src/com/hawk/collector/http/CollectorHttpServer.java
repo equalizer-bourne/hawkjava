@@ -1,5 +1,6 @@
 ﻿package com.hawk.collector.http;
 
+import java.io.OutputStream;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
@@ -10,10 +11,27 @@ import java.util.concurrent.Executors;
 import org.hawk.log.HawkLog;
 import org.hawk.os.HawkException;
 
-import com.hawk.collector.handler.ReportDataHandler;
-import com.hawk.collector.handler.ReportLoginHandler;
-import com.hawk.collector.handler.ReportRechargeHandler;
-import com.hawk.collector.handler.ReportRegisterHandler;
+import com.hawk.collector.handler.report.ReportDataHandler;
+import com.hawk.collector.handler.report.ReportGoldInfoHandler;
+import com.hawk.collector.handler.report.ReportLoginHandler;
+import com.hawk.collector.handler.report.ReportRechargeHandler;
+import com.hawk.collector.handler.report.ReportRegisterHandler;
+import com.hawk.collector.handler.report.ReportServerInfoHandler;
+import com.hawk.collector.handler.report.ReportTutorialHandler;
+import com.hawk.collector.handler.service.DailyAnalyzeHandler;
+import com.hawk.collector.handler.service.FetchBillsInfoHandler;
+import com.hawk.collector.handler.service.FetchGameInfoHandler;
+import com.hawk.collector.handler.service.FetchGeneralInfoHandler;
+import com.hawk.collector.handler.service.FetchGoldInfoHandler;
+import com.hawk.collector.handler.service.FetchMyIpInfoHandler;
+import com.hawk.collector.handler.service.FetchOperationInfoHandler;
+import com.hawk.collector.handler.service.FetchOrderInfoHandler;
+import com.hawk.collector.handler.service.FetchPuidRechargeHandler;
+import com.hawk.collector.handler.service.FetchServerInfoHandler;
+import com.hawk.collector.handler.service.FetchStatisticsInfoHandler;
+import com.hawk.collector.handler.service.FetchTutorialLevelHandler;
+import com.hawk.collector.handler.service.FetchTutorialStepHandler;
+import com.hawk.collector.handler.system.CreateGameRequestHandler;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -80,11 +98,33 @@ public class CollectorHttpServer {
 	 * @return
 	 */
 	private boolean installContext() {
-		try {
+		try {			
 			httpServer.createContext("/report_register", new ReportRegisterHandler());
 			httpServer.createContext("/report_login", new ReportLoginHandler());
 			httpServer.createContext("/report_recharge", new ReportRechargeHandler());
+			httpServer.createContext("/report_gold", new ReportGoldInfoHandler());
+			httpServer.createContext("/report_server", new ReportServerInfoHandler());
 			httpServer.createContext("/report_data", new ReportDataHandler());
+			httpServer.createContext("/report_tutorial", new ReportTutorialHandler());
+			
+			httpServer.createContext("/create_game", new CreateGameRequestHandler());
+			httpServer.createContext("/daily_analyze", new DailyAnalyzeHandler());
+			
+			httpServer.createContext("/fetch_myip", new FetchMyIpInfoHandler());
+			httpServer.createContext("/fetch_game", new FetchGameInfoHandler());
+			httpServer.createContext("/fetch_server", new FetchServerInfoHandler());
+			httpServer.createContext("/fetch_operation", new FetchOperationInfoHandler());
+			httpServer.createContext("/fetch_statistics", new FetchStatisticsInfoHandler());
+			httpServer.createContext("/fetch_general", new FetchGeneralInfoHandler());
+
+			httpServer.createContext("/fetch_recharge", new FetchPuidRechargeHandler());
+			httpServer.createContext("/fetch_order", new FetchOrderInfoHandler());
+			httpServer.createContext("/fetch_bills", new FetchBillsInfoHandler());
+			
+			httpServer.createContext("/fetch_gold", new FetchGoldInfoHandler());
+			httpServer.createContext("/fetch_tutorial_level", new FetchTutorialLevelHandler());
+			httpServer.createContext("/fetch_tutorial_step", new FetchTutorialStepHandler());
+			
 			return true;
 		} catch (Exception e) {
 			HawkException.catchException(e);
@@ -112,10 +152,17 @@ public class CollectorHttpServer {
 	 * @param httpExchange
 	 * @param response
 	 */
-	public static void response(HttpExchange httpExchange) {
+	public static void response(HttpExchange httpExchange, String response) {
 		try {
-			httpExchange.sendResponseHeaders(200, 0);
-			httpExchange.getResponseBody().close();
+			OutputStream responseBody = httpExchange.getResponseBody();
+			if (response != null && response.length() > 0) {
+				byte[] bytes = response.getBytes("UTF-8");
+				httpExchange.sendResponseHeaders(200, bytes.length);
+				responseBody.write(bytes);
+			} else {
+				httpExchange.sendResponseHeaders(200, 0);
+			}
+			responseBody.close();
 		} catch (Exception e) {
 			HawkException.catchException(e);
 		}

@@ -1,0 +1,186 @@
+# 获取自身ip和zmq服务端口
+182.254.230.39:9001/fetch_myip
+-> {"myIp":"180.79.32.28","zmqPort":9901}
+
+# 创建/更新游戏信息
+182.254.230.39:9001/create_game?game=wow&platform=android,ios,appstore&channel=91,bddk,360,xm,uc&logUserName=hawk&logUserPwd=000000&logPath=&sshPort=0
+-> {"game":"wow","platform":"android,ios,appstore","channel":"91,bddk,360,xm,uc","logUserName":"", "logUserPwd":"", "logPath":"", "sshPort":"0", "status":0}
+
+# 获取所有游戏信息
+182.254.230.39:9001/fetch_game
+-> [{"game":"wow","platform":"android,ios,appstore","channel":"91,bddk,360,xm,uc","logUserName":"", "logUserPwd":"", "logPath":"", "sshPort":"0"}]
+
+# 获取游戏服务器信息
+182.254.230.39:9001/fetch_server?game=gtgj
+-> [{"game":"gtgj","platform":"test","server":"900000","ip":"180.79.32.28","listen_port":"9595","script_port":"5132","dburl":"jdbc:mysql://localhost:3306/game","dbuser":"root","dbpwd":"123456"}]
+
+# 获取实时数据
+182.254.230.39:9001/fetch_operation?game=wow&beginDate=2014-09-01&endDate=2014-09-01&channel=uc
+-> [{"game":"wow","platform":"","channel":"uc","date":"2014-09-01","totalUser":101228,"newUser":1682,"totalDevice":76600,"newDevice":921,"userLogin":3985,"deviceLogin":3377,"totalPayUser":9344,"payUser":267,"totalPayDevice":8524,"payDevice":247,"totalPayMoney":2240910,"payMoney":19230,"ARPU":4.825596,"ARPD":5.694403,"ARPPU":72.02247,"PayRate":0.06700125,"LTV2":6.7360287,"LTV3":9.268727,"LTV7":16.09988,"LTV14":19.072533,"LTV30":22.217598,"userRetention2":0.6486326,"userRetention3":0.5915577,"userRetention7":0.4554102,"userRetention14":0.31450653,"userRetention30":0.18133175,"deviceRetention2":0.56677526,"deviceRetention3":0.5103149,"deviceRetention7":0.42128122,"deviceRetention14":0.30510315,"deviceRetention30":0.1878393}]
+
+# 获取实时数据
+182.254.230.39:9001/fetch_operation?game=wow&beginDate=2014-09-01&endDate=2014-09-01&platform=ios
+-> [{"game":"wow","platform":"ios","channel":"","date":"2014-09-01","totalUser":316830,"newUser":3594,"totalDevice":286044,"newDevice":2760,"userLogin":12528,"deviceLogin":11265,"totalPayUser":21176,"payUser":659,"totalPayDevice":20154,"payDevice":563,"totalPayMoney":6679130,"payMoney":48050,"ARPU":3.8354087,"ARPD":4.265424,"ARPPU":72.913506,"PayRate":0.052602172,"LTV2":3.3611574,"LTV3":6.5831943,"LTV7":13.010573,"LTV14":18.252644,"LTV30":23.845297,"userRetention2":0.52865887,"userRetention3":0.47468004,"userRetention7":0.37479132,"userRetention14":0.28937116,"userRetention30":0.17807457,"deviceRetention2":0.47210145,"deviceRetention3":0.41847825,"deviceRetention7":0.34166667,"deviceRetention14":0.27463767,"deviceRetention30":0.1731884}]
+
+# 获取实时数+存库
+182.254.230.39:9001/fetch_operation?game=wow&beginDate=2014-09-01&endDate=2014-09-01&platform=ios&statistics=1
+-> [{"game":"wow","platform":"ios","channel":"","date":"2014-09-02","totalUser":316830,"newUser":3870,"totalDevice":286044,"newDevice":3222,"userLogin":13836,"deviceLogin":12535,"totalPayUser":21176,"payUser":669,"totalPayDevice":20154,"payDevice":572,"totalPayMoney":6679130,"payMoney":51890,"ARPU":3.7503614,"ARPD":4.139609,"ARPPU":77.56353,"PayRate":0.048352126,"LTV2":5.5142117,"LTV3":7.390181,"LTV7":11.612403,"LTV14":15.095607,"LTV30":20.072351,"userRetention2":0.53126615,"userRetention3":0.46434107,"userRetention7":0.37932816,"userRetention14":0.2896641,"userRetention30":0.17829457,"deviceRetention2":0.49751708,"deviceRetention3":0.44072005,"deviceRetention7":0.3659218,"deviceRetention14":0.28646803,"deviceRetention30":0.18249534}]
+
+# 获取历史分析数据
+182.254.230.39:9001/fetch_statistics?game=wow&beginDate=2014-09-01&endDate=2014-09-02&platform=ios
+-> [{"game":"wow","platform":"ios","channel":"","date":"2014-09-01","totalUser":316830,"newUser":3594,"totalDevice":286044,"newDevice":2760,"userLogin":12528,"deviceLogin":11265,"totalPayUser":21176,"payUser":659,"totalPayDevice":20154,"payDevice":563,"totalPayMoney":6679130,"payMoney":48050,"ARPU":3.8354087,"ARPD":4.265424,"ARPPU":72.913506,"PayRate":0.052602172,"LTV2":3.3611574,"LTV3":6.5831943,"LTV7":13.010573,"LTV14":18.252644,"LTV30":23.845297,"userRetention2":0.52865887,"userRetention3":0.47468004,"userRetention7":0.37479132,"userRetention14":0.28937116,"userRetention30":0.17807457,"deviceRetention2":0.47210145,"deviceRetention3":0.41847825,"deviceRetention7":0.34166667,"deviceRetention14":0.27463767,"deviceRetention30":0.1731884},{"game":"wow","platform":"ios","channel":"","date":"2014-09-02","totalUser":316830,"newUser":3870,"totalDevice":286044,"newDevice":3222,"userLogin":13836,"deviceLogin":12535,"totalPayUser":21176,"payUser":669,"totalPayDevice":20154,"payDevice":572,"totalPayMoney":6679130,"payMoney":51890,"ARPU":3.7503614,"ARPD":4.139609,"ARPPU":77.56353,"PayRate":0.048352126,"LTV2":5.5142117,"LTV3":7.390181,"LTV7":11.612403,"LTV14":15.095607,"LTV30":20.072351,"userRetention2":0.53126615,"userRetention3":0.46434107,"userRetention7":0.37932816,"userRetention14":0.2896641,"userRetention30":0.17829457,"deviceRetention2":0.49751708,"deviceRetention3":0.44072005,"deviceRetention7":0.3659218,"deviceRetention14":0.28646803,"deviceRetention30":0.18249534}]
+
+# 手动运算运营数据+存库
+182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-01
+-> {"game":"wow","platform":"","channel":"","date":"2014-12-01","totalUser":1814807,"newUser":17189,"totalDevice":1590137,"newDevice":11367,"userLogin":179830,"deviceLogin":168911,"totalPayUser":118007,"payUser":3307,"totalPayDevice":109637,"payDevice":3279,"totalPayMoney":35220653,"payMoney":202484,"ARPU":1.1259745,"ARPD":1.1987615,"ARPPU":61.22891,"PayRate":0.01838959,"LTV2":0.0,"LTV3":0.0,"LTV7":0.0,"LTV14":0.0,"LTV30":0.0,"userRetention2":0.0,"userRetention3":0.0,"userRetention7":0.0,"userRetention14":0.0,"userRetention30":0.0,"deviceRetention2":0.0,"deviceRetention3":0.0,"deviceRetention7":0.0,"deviceRetention14":0.0,"deviceRetention30":0.0}
+
+# 游戏订单查询
+182.254.230.39:9001/fetch_order?game=wow&orderid=201408271536538182021
+-> {"orderid":"201408271536538182021","platform":"android","server":"1","puid":"uc_362622091","pay":30,"currency":"RMB","time":"2014-08-27 15:37:12"}
+
+# 查询指定puid的充值信息
+182.254.230.39:9001/fetch_recharge?game=wow&puid=bddk_3964955365
+-> [{"puid":"bddk_3964955365","orderid":"d2a673d860ea47bc9076094aafd887d3","platform":"android","server":"1","pay":10,"currency":"RMB","time":"2014-08-27 14:58:03"},{"puid":"bddk_3964955365","orderid":"12962d471f1f4fe78c8bda418d855d24","platform":"android","server":"1","pay":30,"currency":"RMB","time":"2014-08-27 14:58:18"},{"puid":"bddk_3964955365","orderid":"0a4278309e3240cebe3043f3d39346b9","platform":"android","server":"1","pay":10,"currency":"RMB","time":"2014-09-01 15:31:29"},{"puid":"bddk_3964955365","orderid":"5476ab1a47c64a3c84e430a603c2aa0e","platform":"android","server":"1","pay":10,"currency":"RMB","time":"2014-09-04 10:15:13"},{"puid":"bddk_3964955365","orderid":"0f6fa152fcde42ada06271f011320482","platform":"android","server":"1","pay":10,"currency":"RMB","time":"2014-09-16 15:44:34"}]
+
+# 查询指定渠道的特定时间端对账单
+182.254.230.39:9001/fetch_bills?game=wow&channel=uc&beginDate=2014-12-01&endDate=2014-01-10
+-> [{"orderid":"201408271536538182021","platform":"android","server":"1","puid":"uc_362622091","pay":30,"currency":"RMB","time":"2014-08-27 15:37:12.0"},{"orderid":"201408271516348179842","platform":"android","server":"1","puid":"uc_358507836","pay":10,"currency":"RMB","time":"2014-08-27 15:17:12.0"},{"orderid":"201408271518148180027","platform":"android","server":"1","puid":"uc_358507836","pay":10,"currency":"RMB","time":"2014-08-27 15:18:25"}]
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 测试数据计算
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-08-28"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-08-29"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-08-30"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-08-31"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-01"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-02"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-03"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-04"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-05"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-06"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-07"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-08"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-09"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-10"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-11"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-12"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-13"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-14"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-15"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-16"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-17"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-18"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-19"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-20"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-21"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-22"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-23"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-24"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-25"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-26"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-27"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-28"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-29"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-09-30"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-01"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-02"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-03"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-04"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-05"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-06"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-07"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-08"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-09"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-10"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-11"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-12"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-13"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-14"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-15"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-16"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-17"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-18"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-19"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-20"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-21"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-22"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-23"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-24"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-25"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-26"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-27"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-28"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-29"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-30"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-10-31"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-01"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-02"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-03"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-04"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-05"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-06"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-07"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-08"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-09"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-10"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-11"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-12"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-13"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-14"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-15"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-16"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-17"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-18"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-19"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-20"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-21"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-22"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-23"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-24"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-25"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-26"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-27"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-28"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-29"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-11-30"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-01"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-02"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-03"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-04"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-05"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-06"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-07"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-08"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-09"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-10"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-11"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-12"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-13"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-14"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-15"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-16"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-17"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-18"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-19"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-20"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-21"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-22"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-23"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-24"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-25"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-26"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-27"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-28"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-29"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-30"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2014-12-31"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-01"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-02"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-03"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-04"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-05"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-06"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-07"
+curl "http://182.254.230.39:9001/daily_analyze?game=wow&date=2015-01-08"
