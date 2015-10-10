@@ -28,7 +28,7 @@ public class HawkRand {
 	 */
 	public static int randInt() {
 		if (State < 0) {
-			Random random = new Random(System.currentTimeMillis());
+			Random random = new Random(HawkTime.getMillisecond());
 			State = random.nextInt();
 		}
 

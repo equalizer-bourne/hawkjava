@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.hawk.app.HawkApp;
 import org.hawk.app.HawkAppObj;
 import org.hawk.os.HawkException;
+import org.hawk.xid.HawkXID;
 
 /**
  * 消息远程过程调用
@@ -39,6 +40,15 @@ public class HawkMsgRpc {
 	 */
 	private HawkMsgRpc() {
 		rpcInvokerMap = new ConcurrentHashMap<Integer, HawkRpcInvoker>();
+	}
+	
+	/**
+	 * 消息远程调用
+	 * 
+	 * @return
+	 */
+	public boolean call(HawkXID requester, HawkXID responder, HawkRpcInvoker invoker) {
+		return call(HawkMsg.valueOf(requester, responder), invoker);
 	}
 	
 	/**

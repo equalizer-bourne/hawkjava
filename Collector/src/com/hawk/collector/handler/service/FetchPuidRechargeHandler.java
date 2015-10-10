@@ -46,7 +46,7 @@ public class FetchPuidRechargeHandler implements HttpHandler {
 		JsonArray jsonArray = new JsonArray();
 		Statement statement = null;
 		try {
-			String sql = String.format("SELECT orderid, platform, server, pay, currency, time FROM recharge WHERE game = '%s' AND puid = '%s'", game, puid);
+			String sql = String.format("SELECT pforder, platform, server, orderMoney, payMoney, addGold, giftGold, currency, time FROM recharge WHERE game = '%s' AND puid = '%s'", game, puid);
 
 			statement = DBManager.getInstance().createStatement(game);
 			ResultSet resultSet = statement.executeQuery(sql);
@@ -57,7 +57,10 @@ public class FetchPuidRechargeHandler implements HttpHandler {
 				jsonObject.addProperty("orderid", resultSet.getString(++column));
 				jsonObject.addProperty("platform", resultSet.getString(++column));
 				jsonObject.addProperty("server", resultSet.getString(++column));				
+				jsonObject.addProperty("orderMoney", resultSet.getInt(++column));
 				jsonObject.addProperty("pay", resultSet.getInt(++column));
+				jsonObject.addProperty("addGold", resultSet.getInt(++column));
+				jsonObject.addProperty("giftGold", resultSet.getInt(++column));
 				jsonObject.addProperty("currency", resultSet.getString(++column));
 				SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 				jsonObject.addProperty("time", sdf.format(resultSet.getTimestamp(++column)));

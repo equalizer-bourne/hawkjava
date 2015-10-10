@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.hawk.app.HawkApp;
+import org.hawk.log.HawkLog;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkOSOperator;
 import org.hawk.util.HawkTickable;
@@ -44,6 +45,14 @@ public class HawkMysqlSession extends HawkTickable {
 	 * @return
 	 */
 	public boolean init(String dbHost, String dbUser, String dbPwd, int poolSize) {
+		//加载驱动程序
+		try {
+			Class.forName("com.mysql.jdbc.Driver");
+		} catch (Exception e) {
+			HawkException.catchException(e);
+			return false;
+		}
+		
 		try {
 			this.dbHost = dbHost;
 			this.dbUser = dbUser;
@@ -134,6 +143,7 @@ public class HawkMysqlSession extends HawkTickable {
 			statement = connection.prepareStatement(sql);
 		} catch (Exception e) {
 			HawkException.catchException(e);
+			HawkLog.logPrintln(sql);
 		}
 		return statement;
 	}
@@ -153,6 +163,7 @@ public class HawkMysqlSession extends HawkTickable {
 			return rowCount;
 		} catch (Exception e) {
 			HawkException.catchException(e);
+			HawkLog.logPrintln(sql);
 		} finally {
 			if (statement != null) {
 				try {

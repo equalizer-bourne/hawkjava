@@ -1,4 +1,4 @@
-package org.hawk.net;
+package org.hawk.script;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -6,18 +6,20 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 
+import org.hawk.net.HawkSession;
+
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpPrincipal;
 
-public class HawkSessionHttpExchange extends HttpExchange {
+public class HawkScriptHttpExchange extends HttpExchange {
 	/**
 	 * 会话
 	 */
 	private HawkSession session;
 	
-	public HawkSessionHttpExchange(HawkSession session) {
+	public HawkScriptHttpExchange(HawkSession session) {
 		this.session = session;
 	}
 	
@@ -27,8 +29,8 @@ public class HawkSessionHttpExchange extends HttpExchange {
 	}
 
 	@Override
-	public Object getAttribute(String arg0) {
-		if (arg0 != null && arg0.equals("session")) {
+	public Object getAttribute(String attrKey) {
+		if (attrKey != null && attrKey.equals("session")) {
 			return session;
 		}
 		return null;

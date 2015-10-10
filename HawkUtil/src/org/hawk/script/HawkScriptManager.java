@@ -19,7 +19,6 @@ import org.hawk.app.HawkApp;
 import org.hawk.log.HawkLog;
 import org.hawk.nativeapi.HawkNativeApi;
 import org.hawk.net.HawkSession;
-import org.hawk.net.HawkSessionHttpExchange;
 import org.hawk.net.protocol.HawkProtocol;
 import org.hawk.os.HawkException;
 import org.hawk.script.HawkScriptConfig.ScriptInfo;
@@ -97,7 +96,7 @@ public class HawkScriptManager {
 			if (httpAddr != null && httpAddr.length() > 0) {
 				String[] addrInfo = httpAddr.split(":");
 				if (addrInfo != null && addrInfo.length == 2) {
-					httpServer = HttpServer.create(new InetSocketAddress(addrInfo[0], Integer.valueOf(addrInfo[1])), 0);
+					httpServer = HttpServer.create(new InetSocketAddress(addrInfo[0], Integer.valueOf(addrInfo[1])), 100);					
 					httpServer.createContext("/", new HawkScriptHttpHandler());
 					httpServer.setExecutor(Executors.newFixedThreadPool(2));
 					httpServer.start();
@@ -122,6 +121,7 @@ public class HawkScriptManager {
 			httpServer.stop(0);
 			httpServer = null;
 		}
+		HawkLog.logPrintln("close script manager");
 	}
 
 	/**
@@ -300,7 +300,7 @@ public class HawkScriptManager {
 		if (httpExchange != null) {
 			try {
 				// 是会话协议格式的请求
-				if (httpExchange instanceof HawkSessionHttpExchange) {
+				if (httpExchange instanceof HawkScriptHttpExchange) {
 					HawkSession session = (HawkSession) httpExchange.getAttribute("session");
 					session.sendProtocol(HawkProtocol.valueOf(0, result.getBytes("UTF-8")));
 					return;
@@ -354,7 +354,7 @@ public class HawkScriptManager {
 					}
 					HawkScript script = getScript(scriptId);
 					if (script != null) {
-						script.action(params, new HawkSessionHttpExchange(protocol.getSession()));
+						script.action(params, new HawkScriptHttpExchange(protocol.getSession()));
 					}
 					return true;
 				} else if (action.equals("run_shell")) {

@@ -4,6 +4,11 @@ import org.hawk.log.HawkLog;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkOSOperator;
 
+import com.hawk.collector.http.CollectorHttpServer;
+
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
+
 /**
  * 关闭退出钩子
  * 
@@ -38,5 +43,28 @@ public class ShutDownHook {
 				CollectorServices.getInstance().breakLoop();
 			}
 		});
+		
+		// kill -17信号处理注册回调
+		try {
+			Signal.handle(new Signal("CHLD"), new http_SignalHandler("CHLD"));
+		} catch (Exception e) {
+		}
+	}
+	
+	/**
+	 * 
+	 * @author hawk
+	 */
+	static class http_SignalHandler implements SignalHandler {
+		private String signalName;
+		
+		public http_SignalHandler(String name) {
+			this.signalName = name;
+		}
+		
+		public void handle(Signal signal) {
+			HawkLog.logPrintln("signal handler: " + this.getClass().getSimpleName() + ", name: " + signalName);
+			CollectorHttpServer.getInstance().restart();
+		}
 	}
 }

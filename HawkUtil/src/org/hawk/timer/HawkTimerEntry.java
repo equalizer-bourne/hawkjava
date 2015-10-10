@@ -321,7 +321,7 @@ public class HawkTimerEntry implements Comparable<HawkTimerEntry> {
 			updateDayOfMonth(alarm);
 		}
 		alarmTime = alarm.getTime().getTime();
-		lastUpdateTime = System.currentTimeMillis();
+		lastUpdateTime = HawkTime.getMillisecond();
 	}
 
 	private void updateDayOfMonth(Calendar alarm) {

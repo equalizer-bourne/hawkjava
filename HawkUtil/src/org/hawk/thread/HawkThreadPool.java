@@ -72,6 +72,24 @@ public class HawkThreadPool {
 	}
 
 	/**
+	 * 初始化(poolSize表示线程数)
+	 * 
+	 * @param poolSize
+	 * @return
+	 */
+	public boolean initPool(int poolSize, boolean start) {
+		// 检测
+		if (!initPool(poolSize)) {
+			return false;
+		}
+		// 开始
+		if (start && !start()) {
+			return false;
+		}
+		return true;
+	}
+	
+	/**
 	 * 添加执行任务(threadIdx指定线程执行)
 	 * 
 	 * @param task
@@ -116,6 +134,17 @@ public class HawkThreadPool {
 	public boolean start() {
 		if (!running) {
 			running = true;
+			
+			// 重构线程池列表
+			if (threadList.size() == 0 && threadNum > 0) {
+				for (int i = 0; i < threadNum; i++) {
+					HawkThread thread = new HawkThread();
+					thread.setName(poolName + "-" + thread.getId());
+					threadList.add(thread);
+				}
+			}
+			
+			// 开启所有线程
 			for (int i = 0; i < threadNum; i++) {
 				threadList.get(i).start();
 			}
@@ -146,6 +175,20 @@ public class HawkThreadPool {
 	}
 
 	/**
+	 * 获取堆积的任务数量
+	 */
+	public long getUnprocessTaskCount() {
+		long count = 0;
+		for (int i = 0; i< threadNum; i++) {
+			HawkThread thread = threadList.get(i);
+			if (thread != null) {
+				count += (thread.getPushTaskCnt() - thread.getPopTaskCnt());
+			}
+		}
+		return count;
+	}
+	
+	/**
 	 * 结束所有线程
 	 */
 	public void close(boolean waitBreak) {
@@ -167,7 +210,8 @@ public class HawkThreadPool {
 
 			// 设置标记
 			this.running = false;
-			this.waitBreak = false;
+			this.waitBreak = false;			
+			threadList.clear();
 		}
 	}
 

@@ -5,16 +5,15 @@ import java.util.List;
 
 import org.apache.commons.mail.Email;
 import org.apache.commons.mail.SimpleEmail;
-import org.hawk.app.HawkApp;
 import org.hawk.thread.HawkTask;
-import org.hawk.thread.HawkThreadPool;
+import org.hawk.thread.HawkThread;
 
 /**
  * 邮件服务
  * 
  * @author hawk
  */
-public class HawkEmailService {
+public class HawkEmailService extends HawkThread {
 	/**
 	 * 服务信息
 	 */
@@ -23,10 +22,10 @@ public class HawkEmailService {
 	private String emailUser = "";
 	private String emailPwd = "";
 	/**
-	 * 执行线程池
+	 * 服务是否可用
 	 */
-	protected HawkThreadPool executor;
-	
+	private boolean serviceEnable = true;
+
 	/**
 	 * 实例对象
 	 */
@@ -60,17 +59,41 @@ public class HawkEmailService {
 		this.emailPort = port;
 		this.emailUser = user;
 		this.emailPwd = pwd;
+		// 开启线程
+		this.setName("EmailService");
+		if (!isRunning()) {
+			this.start();
+		}
 		return true;
 	}
 
 	/**
+	 * 关闭服务
+	 */
+	@Override
+	public boolean close(boolean waitBreak) {
+		enableService(false);
+		return super.close(waitBreak);
+	}
+
+	/**
+	 * 开启或关闭服务
+	 * 
+	 * @param enable
+	 */
+	public void enableService(boolean enable) {
+		this.serviceEnable = enable;
+	}
+
+	/**
 	 * 检测是否有效
+	 * 
 	 * @return
 	 */
 	public boolean checkValid() {
-		return emailHost.length() > 0 && emailUser.length() > 0;
+		return serviceEnable && emailHost.length() > 0 && emailUser.length() > 0;
 	}
-	
+
 	/**
 	 * 发送邮件
 	 * 
@@ -80,16 +103,7 @@ public class HawkEmailService {
 	 */
 	public synchronized void sendEmail(String title, String content, List<String> receivers) {
 		if (checkValid()) {
-			if (HawkApp.getInstance() != null) {
-				HawkApp.getInstance().postCommonTask(new EmailTask(title, content, receivers));
-			} else {
-				if (executor == null) {
-					executor = new HawkThreadPool("EmailService");
-					executor.initPool(2);
-					executor.start();
-				}
-				executor.addTask(new EmailTask(title, content, receivers));
-			}
+			addTask(new EmailTask(title, content, receivers));
 		}
 	}
 
@@ -106,12 +120,13 @@ public class HawkEmailService {
 		// 邮件收件人
 		private List<String> receivers;
 
-		EmailTask() {
-			this.title = "";
-			this.content = "";
-			this.receivers = new LinkedList<String>();
-		}
-		
+		/**
+		 * 构造邮件任务
+		 * 
+		 * @param title
+		 * @param content
+		 * @param receivers
+		 */
 		EmailTask(String title, String content, List<String> receivers) {
 			this.title = title;
 			this.content = content;
@@ -119,6 +134,9 @@ public class HawkEmailService {
 			this.receivers.addAll(receivers);
 		}
 
+		/**
+		 * 邮件投递
+		 */
 		@Override
 		protected int run() {
 			try {

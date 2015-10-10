@@ -8,7 +8,9 @@ import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.hawk.log.HawkLog;
 import org.hawk.os.HawkException;
+import org.hawk.os.HawkTime;
 
 /**
  * 定时器管理器
@@ -263,6 +265,8 @@ public class HawkTimerManager {
 		} finally {
 			lock.unlock();
 		}
+		
+		HawkLog.logPrintln("close timer manager");
 	}
 
 	/**
@@ -355,7 +359,7 @@ public class HawkTimerManager {
 		// 唤醒AlarmWaiter继续下一个
 		if (!timerQueue.isEmpty()) {
 			long alarmTime = timerQueue.first().alarmTime;
-			if (alarmTime - System.currentTimeMillis() < 1000) {
+			if (alarmTime - HawkTime.getMillisecond() < 1000) {
 				ringNextAlarm();
 			} else {
 				waiter.restart(alarmTime);

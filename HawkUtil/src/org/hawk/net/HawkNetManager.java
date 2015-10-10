@@ -21,6 +21,7 @@ import org.hawk.codec.HawkEncoder;
 import org.hawk.log.HawkLog;
 import org.hawk.nativeapi.HawkNativeApi;
 import org.hawk.net.client.HawkClientIoHandler;
+import org.hawk.net.http.HawkHttpHandler;
 import org.hawk.net.protocol.HawkProtocol;
 import org.hawk.os.HawkException;
 import org.hawk.script.HawkScriptManager;
@@ -48,15 +49,11 @@ public class HawkNetManager {
 	/**
 	 * 协议频率
 	 */
-	private int sessionPPS = 5;
+	private int sessionPPS = 0;
 	/**
 	 * 是否允许加密
 	 */
 	private boolean enableEncryption = false;
-	/**
-	 * 内嵌http服务器
-	 */
-	private HttpServer httpServer = null;
 	/**
 	 * 网络接收器
 	 */
@@ -69,6 +66,14 @@ public class HawkNetManager {
 	 * io处理器
 	 */
 	private HawkIoHandler ioHandler;
+	/**
+	 * 是否为http服务器
+	 */
+	private boolean isHttpServer = false;
+	/**
+	 * 内嵌http服务器
+	 */
+	private HttpServer httpServer = null;
 	/**
 	 * ip白名单
 	 */
@@ -109,8 +114,9 @@ public class HawkNetManager {
 	 * @param port
 	 * @return
 	 */
-	public boolean init(int port, int ioFilterChain, boolean asHttp) {
-		if (asHttp) {
+	public boolean init(int port, int ioFilterChain, boolean isHttpServer) {
+		this.isHttpServer = isHttpServer;
+		if (isHttpServer) {
 			return setupHttpServer(port, ioFilterChain);
 		}
 		
@@ -123,7 +129,7 @@ public class HawkNetManager {
 	 * @param port
 	 * @return
 	 */
-	public boolean init(int port, int ioFilterChain, IoHandler ioHandler) {
+	public boolean init(int port, int poolSize, IoHandler ioHandler) {
 		try {
 			if (port <= 0) {
 				return false;
@@ -142,8 +148,8 @@ public class HawkNetManager {
 				// 设置编码器&解码器
 				acceptor.getFilterChain().addLast("codec", new ProtocolCodecFilter(HawkEncoder.class, HawkDecoder.class));
 				// 添加IoFilterChain线程池
-				if (ioFilterChain > 0) {
-					OrderedThreadPoolExecutor executor = new OrderedThreadPoolExecutor(ioFilterChain);
+				if (poolSize > 0) {
+					OrderedThreadPoolExecutor executor = new OrderedThreadPoolExecutor(poolSize);
 					acceptor.getFilterChain().addLast("threadPool", new ExecutorFilter(executor));
 				}
 				
@@ -223,6 +229,24 @@ public class HawkNetManager {
 	}
 
 	/**
+	 * 判定是否为http服务器
+	 * 
+	 * @return
+	 */
+	public boolean isHttpServer() {
+		return isHttpServer;
+	}
+	
+	/**
+	 * 判定网络是否开启
+	 * 
+	 * @return
+	 */
+	public boolean isStart() {
+		return acceptor != null || httpServer != null;
+	}
+	
+	/**
 	 * 关闭网络
 	 */
 	public void close() {
@@ -244,6 +268,7 @@ public class HawkNetManager {
 
 		// 关闭所有会话
 		closeAllSession();
+		HawkLog.logPrintln("close network");
 	}
 
 	/**
@@ -406,6 +431,13 @@ public class HawkNetManager {
 	}
 
 	/**
+	 * 清空白名单
+	 */
+	public void clearWhiteIp() {
+		whiteIptables.clear();
+	}
+	
+	/**
 	 * 添加ip黑名单
 	 * 
 	 * @param ip
@@ -420,9 +452,16 @@ public class HawkNetManager {
 	 * @param ip
 	 */
 	public void removeBlackIp(String ip) {
-		whiteIptables.remove(ip);
+		blackIptables.remove(ip);
 	}
 
+	/**
+	 * 清空黑名单
+	 */
+	public void clearBlackIp() {
+		blackIptables.clear();
+	}
+	
 	/**
 	 * 白名单检测, 是否在白名单列表
 	 * 

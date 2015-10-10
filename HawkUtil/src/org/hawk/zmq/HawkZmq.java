@@ -23,7 +23,7 @@ public class HawkZmq {
 	/**
 	 * 超时默认设置常量
 	 */
-	public static final int HZMQ_OPT_TIMEOUT = 100;
+	public static final int HZMQ_OPT_TIMEOUT = 0;
 	/**
 	 * 接收缓冲区
 	 */
@@ -53,7 +53,7 @@ public class HawkZmq {
 	 */
     public static final int HZMQ_DONTWAIT = 1;
     /**
-     * 继续发生
+     * 继续发送
      */
     public static final int HZMQ_SNDMORE = 2;
     
@@ -203,6 +203,15 @@ public class HawkZmq {
 		return socket;
 	}
 
+	/**
+	 * 获取当前数据缓冲
+	 * 
+	 * @return
+	 */
+	public HawkOctetsStream getStream() {
+		return stream;
+	}
+	
 	/**
 	 * 关闭释放对象
 	 */
@@ -369,7 +378,7 @@ public class HawkZmq {
 		if (socket != null) {
 			// 初始创建
 			if (socketPoll == null) {
-				socketPoll = new ZMQ.PollItem[] { new ZMQ.PollItem(socket, ZMQ.Poller.POLLIN | ZMQ.Poller.POLLERR) };
+				socketPoll = new ZMQ.PollItem[] { new ZMQ.PollItem(socket, ZMQ.Poller.POLLIN | ZMQ.Poller.POLLOUT | ZMQ.Poller.POLLERR) };
 			}
 			
 			// 查询事件

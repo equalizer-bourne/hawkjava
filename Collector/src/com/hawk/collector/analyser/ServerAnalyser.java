@@ -64,7 +64,7 @@ public class ServerAnalyser {
 		JsonArray jsonArray = new JsonArray();
 		Statement statement = null;
 		try {
-			String sql = "select game, platform, server, ip, folder, listen_port, script_port, dburl, dbuser, dbpwd from server where game = '" + game + "'";
+			String sql = "select game, platform, server, ip, localip, folder, listen_port, script_port, dburl, dbuser, dbpwd from server where game = '" + game + "'";
 			if (platform != null && platform.length() > 0) {
 				sql += " and platform = '" + platform +"'";
 			}
@@ -79,6 +79,7 @@ public class ServerAnalyser {
 				jsonObject.addProperty("platform", resultSet.getString(++column));
 				jsonObject.addProperty("server", resultSet.getString(++column));
 				jsonObject.addProperty("ip", resultSet.getString(++column));
+				jsonObject.addProperty("localip", resultSet.getString(++column));
 				jsonObject.addProperty("folder", resultSet.getString(++column));
 				jsonObject.addProperty("listen_port", resultSet.getString(++column));
 				jsonObject.addProperty("script_port", resultSet.getString(++column));

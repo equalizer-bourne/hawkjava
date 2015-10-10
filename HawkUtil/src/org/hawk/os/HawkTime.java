@@ -48,6 +48,17 @@ public class HawkTime {
 	}
 
 	/**
+	 * 获取系统时间
+	 * 
+	 * @return
+	 */
+	public static Calendar getCalendar(long timeMs) {
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTimeInMillis(timeMs);
+		return calendar;
+	}
+	
+	/**
 	 * 获取系统距1970年1月1日总毫秒
 	 * 
 	 * @return
@@ -150,6 +161,9 @@ public class HawkTime {
 	 * @return
 	 */
 	public static boolean isToday(Date date) {
+		if(date == null) {
+			return false;
+		}
 		Calendar dt1 = getCalendar();
 		Calendar dt2 = getCalendar();
 		dt2.setTime(date);
@@ -179,6 +193,15 @@ public class HawkTime {
 		return sdf.format(calendar.getTime());
 	}
 
+	/**
+	 * 获取日期
+	 * 
+	 * @return
+	 */
+	public static Date getDate() {
+		return getCalendar().getTime();
+	}
+	
 	/**
 	 * 格式化日期
 	 * 

@@ -1,7 +1,6 @@
 package org.hawk.app;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,17 +12,20 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
+import net.sf.json.JSONObject;
+
+import org.apache.mina.core.session.IoSession;
 import org.apache.mina.util.ConcurrentHashSet;
 import org.hawk.app.task.HawkMsgTask;
 import org.hawk.app.task.HawkProtoTask;
 import org.hawk.app.task.HawkTickTask;
-import org.hawk.cache.HawkCache;
 import org.hawk.config.HawkConfigManager;
 import org.hawk.db.HawkDBManager;
 import org.hawk.intercept.HawkInterceptHandler;
 import org.hawk.log.HawkLog;
 import org.hawk.msg.HawkMsg;
 import org.hawk.nativeapi.HawkNativeApi;
+import org.hawk.net.HawkIoHandler;
 import org.hawk.net.HawkNetManager;
 import org.hawk.net.HawkNetStatistics;
 import org.hawk.net.HawkSession;
@@ -35,12 +37,17 @@ import org.hawk.os.HawkOSOperator;
 import org.hawk.os.HawkShutdownHook;
 import org.hawk.os.HawkTime;
 import org.hawk.script.HawkScriptManager;
-import org.hawk.service.HawkServiceManager;
 import org.hawk.shell.HawkShellExecutor;
 import org.hawk.thread.HawkTask;
 import org.hawk.thread.HawkThreadPool;
 import org.hawk.timer.HawkTimerManager;
 import org.hawk.util.HawkTickable;
+import org.hawk.util.services.HawkCdkService;
+import org.hawk.util.services.HawkChatService;
+import org.hawk.util.services.HawkOpsService;
+import org.hawk.util.services.HawkOrderService;
+import org.hawk.util.services.HawkReportService;
+import org.hawk.util.services.helper.HawkOpsServerInfo;
 import org.hawk.xid.HawkXID;
 import org.hawk.zmq.HawkZmq;
 import org.hawk.zmq.HawkZmqManager;
@@ -67,6 +74,10 @@ public abstract class HawkApp extends HawkAppObj {
 	 * 工作路径
 	 */
 	protected String workPath;
+	/**
+	 * 本机ip地址
+	 */
+	protected String myHostIp = "127.0.0.1";
 	/**
 	 * 当前时间(毫秒, 用于初略的逻辑时间计算)
 	 */
@@ -127,7 +138,7 @@ public abstract class HawkApp extends HawkAppObj {
 	 * 拦截器
 	 */
 	protected Map<String, HawkInterceptHandler> interceptMap;
-	
+
 	/**
 	 * 获取全局管理器
 	 * 
@@ -149,11 +160,14 @@ public abstract class HawkApp extends HawkAppObj {
 		instance = this;
 		Thread.currentThread().setName("AppMain");
 
+		// 加载库目录
+		HawkOSOperator.installLibPath();
+				
 		// 初始化工作目录
 		workPath = System.getProperty("user.dir") + File.separator;
 		loopState = LOOP_CLOSED;
 		shellEnable = true;
-		
+
 		// 初始化系统对象
 		appCfg = new HawkAppCfg();
 		tickables = new ConcurrentHashSet<HawkTickable>();
@@ -177,32 +191,6 @@ public abstract class HawkApp extends HawkAppObj {
 			return false;
 		}
 
-		// 添加库加载目录		
-		HawkOSOperator.addUsrPath(System.getProperty("user.dir") + "/lib");
-		HawkOSOperator.addUsrPath(System.getProperty("user.dir") + "/hawk");
-		new File(".").list(new FilenameFilter() {
-			@Override
-			public boolean accept(File dir, String name) {
-				if (dir.isDirectory() && name.endsWith("lib")) {
-					HawkOSOperator.addUsrPath(System.getProperty("user.dir") + "/" + name);
-					return true;
-				}
-				return false;
-			}
-		});
-		
-		try {
-			// 初始化
-			System.loadLibrary("hawk");
-			if (!HawkNativeApi.initHawk()) {
-				return false;
-			}
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		}
-		
-		// 设置打印输出标记
-		HawkLog.enableConsole(appCfg.console);
 		// 设置系统时间偏移
 		HawkTime.setMsOffset(appCfg.calendarOffset);
 		// 初始化系统时间
@@ -221,18 +209,15 @@ public abstract class HawkApp extends HawkAppObj {
 			}
 		}
 
-		// 对象缓存
-		if (appCfg.objCache) {
-			HawkProtocol.setCache(new HawkCache(HawkProtocol.valueOf()));
-			HawkProtoTask.setCache(new HawkCache(HawkProtoTask.valueOf()));
-		}
-		
+		// 获取本机ip
+		myHostIp = HawkOSOperator.getMyIp(2000);
+
+		// 初始化网络统计
+		HawkNetStatistics.getInstance().init();
+				
 		// 初始化zmq管理器
 		HawkZmqManager.getInstance().init(HawkZmq.HZMQ_CONTEXT_THREAD);
 
-		// 添加网络统计到更新列表
-		addTickable(HawkNetStatistics.getInstance());
-		
 		// 初始化配置
 		if (appCfg.configPackages != null && appCfg.configPackages.length() > 0) {
 			if (!HawkConfigManager.getInstance().init(appCfg.configPackages)) {
@@ -243,15 +228,8 @@ public abstract class HawkApp extends HawkAppObj {
 			}
 		}
 
-		// 初始化service管理对象
-		if (appCfg.servicePath != null && appCfg.servicePath.length() > 0) {
-			if (!HawkServiceManager.getInstance().init(appCfg.servicePath)) {
-				return false;
-			}
-		}
-		
 		// 开启消息线程池
-		if (msgExecutor == null && appCfg.threadNum > 0 && appCfg.isMsgTaskMode()) {
+		if (msgExecutor == null && appCfg.threadNum > 0) {
 			msgExecutor = new HawkThreadPool("MsgExecutor");
 			if (!msgExecutor.initPool(appCfg.threadNum) || !msgExecutor.start()) {
 				HawkLog.errPrintln(String.format("init msgExecutor failed, threadNum: %d", appCfg.threadNum));
@@ -286,20 +264,81 @@ public abstract class HawkApp extends HawkAppObj {
 				if (dbThreadNum <= 0) {
 					dbThreadNum = appCfg.threadNum;
 				}
-				
+
 				if (dbThreadNum > 0) {
 					HawkDBManager.getInstance().startAsyncThread(appCfg.dbAsyncPeriod, dbThreadNum);
 					HawkLog.logPrintln(String.format("start dbExecutor, threadNum: %d", dbThreadNum));
 				}
 			}
 		}
-		
+
 		// 自动脚本运行
 		HawkScriptManager.getInstance().autoRunScript();
-		
+
 		return true;
 	}
 
+	/**
+	 * 初始化系统服务
+	 * 
+	 * @return
+	 */
+	public boolean initService(String suuid) {
+		// cdk服务初始化
+		if (appCfg.getCdkHost().length() > 0) {
+			HawkLog.logPrintln("install cdk service......");
+			HawkCdkService.getInstance().install(appCfg.getGameId(), appCfg.getPlatform(), String.valueOf(appCfg.getServerId()), appCfg.getCdkHost(), appCfg.getCdkTimeout());
+		}
+
+		// 数据上报服务初始化
+		if (appCfg.getReportHost().length() > 0) {
+			HawkLog.logPrintln("install report service......");
+			HawkReportService.getInstance().install(appCfg.getGameId(), appCfg.getPlatform(), 
+					String.valueOf(appCfg.getServerId()), appCfg.getReportHost(), appCfg.getReportTimeout());
+		}
+
+		// 开启订单服务
+		if (appCfg.getOrderAddr().length() > 0 && suuid != null && suuid.length() > 0) {
+			if (HawkOrderService.getInstance().init(suuid, appCfg.getOrderAddr(), appCfg.getGameId(), appCfg.getPlatform(), appCfg.getServerId())) {
+				HawkLog.logPrintln("install order service success......");
+			} else {
+				HawkLog.logPrintln("install order service failed......");
+			}
+		}
+		
+		// 开启运维服务
+		if (appCfg.getOpsAgentAddr().length() > 0) {
+			HawkOpsServerInfo serverInfo = new HawkOpsServerInfo();
+			serverInfo.setGame(appCfg.getGameId());
+			serverInfo.setPlatform(appCfg.getPlatform());
+			serverInfo.setServerId("" + appCfg.getServerId());
+			serverInfo.setPort("" + appCfg.getAcceptorPort());
+			serverInfo.setScriptPort("" + HawkScriptManager.getInstance().getScriptConfig().getHttpPort());
+			serverInfo.setDbUrl(appCfg.getDbConnUrl());
+			serverInfo.setDbUser(appCfg.getDbUserName());
+			serverInfo.setDbPwd(appCfg.getDbPassWord());
+			serverInfo.setWorkPath(HawkOSOperator.getWorkPath());
+			serverInfo.setPid("" + HawkOSOperator.getProcessId());
+			serverInfo.setMyip(HawkOSOperator.getMyIp(1000));
+			if (HawkOpsService.getInstance().init(appCfg.getOpsAgentAddr(), serverInfo)) {
+				HawkLog.logPrintln("install ops service success......");
+			} else {
+				HawkLog.logPrintln("install ops service failed......");
+			}
+		}
+		
+		// 开启聊天监控服务
+		if (appCfg.getChatAddr().length() > 0) {
+			if (HawkChatService.getInstance().init(appCfg.getChatAddr(), appCfg.getGameId(), appCfg.getPlatform(), appCfg.getServerId())) {
+				HawkLog.logPrintln("install chat service success......");
+			} else {
+				HawkLog.logPrintln("install chat service failed......");
+			}
+		}
+				
+		return true;
+	}
+	
 	/**
 	 * 开启网络
 	 * 
@@ -311,10 +350,41 @@ public abstract class HawkApp extends HawkAppObj {
 				HawkLog.errPrintln("init network failed, port: " + appCfg.acceptorPort);
 				return false;
 			}
-			
+
 			HawkLog.logPrintln("start network, port: " + appCfg.acceptorPort);
 		}
 		return true;
+	}
+
+	/**
+	 * 更新ip白名单控制
+	 */
+	public void updateIpControl(boolean ipLimit, Map<String, Integer> iptables) {
+		// 黑白名单功能
+		try {
+			HawkIoHandler ioHandler = HawkNetManager.getInstance().getIoHandler();
+			if (ioHandler != null) {
+				if (ipLimit) {
+					ioHandler.setIpUsage(HawkIoHandler.IpUsage.WHITE_IPTABLES | HawkIoHandler.IpUsage.BLACK_IPTABLES);
+				} else {
+					ioHandler.setIpUsage(0);
+				}
+				HawkNetManager.getInstance().clearWhiteIp();
+				HawkNetManager.getInstance().clearBlackIp();
+				
+				if (ipLimit && iptables != null) {
+					for (Entry<String, Integer> entry : iptables.entrySet()) {
+						if (entry.getValue() > 0) {
+							HawkNetManager.getInstance().addWhiteIp(entry.getKey());
+						} else {
+							HawkNetManager.getInstance().addBlackIp(entry.getKey());
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
 	}
 	
 	/**
@@ -336,6 +406,24 @@ public abstract class HawkApp extends HawkAppObj {
 	}
 
 	/**
+	 * 设置本机ip地址
+	 * 
+	 * @param myip
+	 */
+	public void setMyHostIp(String myHostIp) {
+		this.myHostIp = myHostIp;
+	}
+	
+	/**
+	 * 获取本机ip
+	 * 
+	 * @return
+	 */
+	public String getMyHostIp() {
+		return myHostIp;
+	}
+
+	/**
 	 * 获取应用配置对象
 	 * 
 	 * @return
@@ -352,7 +440,7 @@ public abstract class HawkApp extends HawkAppObj {
 	public void setAppCfg(HawkAppCfg appCfg) {
 		this.appCfg = appCfg;
 	}
-	
+
 	/**
 	 * 是否运行状态
 	 * 
@@ -380,7 +468,7 @@ public abstract class HawkApp extends HawkAppObj {
 	public void enableShell(boolean enable) {
 		this.shellEnable = enable;
 	}
-	
+
 	/**
 	 * 线程池线程数目
 	 * 
@@ -390,11 +478,11 @@ public abstract class HawkApp extends HawkAppObj {
 		if (msgExecutor != null) {
 			return msgExecutor.getThreadNum();
 		}
-		
+
 		if (taskExecutor != null) {
 			return taskExecutor.getThreadNum();
 		}
-		
+
 		return 0;
 	}
 
@@ -422,12 +510,13 @@ public abstract class HawkApp extends HawkAppObj {
 
 	/**
 	 * 获取tickable的集合
+	 * 
 	 * @return
 	 */
 	public Set<HawkTickable> getTickables() {
 		return tickables;
 	}
-	
+
 	/**
 	 * 添加可tick对象
 	 * 
@@ -464,47 +553,50 @@ public abstract class HawkApp extends HawkAppObj {
 			}
 		}
 	}
-	
+
 	/**
 	 * 清空tick对象
 	 */
 	public void clearTickable() {
 		tickables.clear();
 	}
-	
+
 	/**
 	 * 添加拦截器
+	 * 
 	 * @param name
 	 * @param handler
 	 */
 	public void addInterceptHandler(String name, HawkInterceptHandler handler) {
 		interceptMap.put(name, handler);
 	}
-	
+
 	/**
 	 * 获取拦截器
+	 * 
 	 * @param name
 	 * @param handler
 	 */
 	public HawkInterceptHandler getInterceptHandler(String name) {
 		return interceptMap.get(name);
 	}
-	
+
 	/**
 	 * 移除拦截器
+	 * 
 	 * @param name
 	 */
 	public void removeInterceptHandler(String name) {
 		interceptMap.remove(name);
 	}
-	
+
 	/**
 	 * 清除拦截器
 	 */
 	public void clearInterceptHandler() {
 		interceptMap.clear();
 	}
-	
+
 	/**
 	 * 是否为debug模式
 	 * 
@@ -516,12 +608,22 @@ public abstract class HawkApp extends HawkAppObj {
 
 	/**
 	 * 设置上次对象移除时间
+	 * 
 	 * @param lastRemoveObjTime
 	 */
 	public void setLastRemoveObjTime(long lastRemoveObjTime) {
 		this.lastRemoveObjTime = lastRemoveObjTime;
 	}
-	
+
+	/**
+	 * 是否为退出状态
+	 * 
+	 * @return
+	 */
+	public boolean isWaitingClose() {
+		return !running || (loopState & LOOP_BREAK) > 0;
+	}
+
 	/**
 	 * 启动服务
 	 * 
@@ -529,17 +631,20 @@ public abstract class HawkApp extends HawkAppObj {
 	 */
 	public boolean run() {
 		if (!running) {
+			// 构建db会话工厂
+			HawkDBManager.getInstance().buildSessionFactory();
+			
 			// 检测网络是否开启
-			if (appCfg.acceptorPort > 0 && HawkNetManager.getInstance().getAcceptor() == null) {
+			if (appCfg.acceptorPort > 0 && !HawkNetManager.getInstance().isStart()) {
 				if (!startNetwork()) {
 					return false;
 				}
 			}
-			
+
 			// 设置状态
 			running = true;
 			loopState = 0;
-			
+
 			HawkLog.logPrintln("server running......");
 			while (running && (loopState & LOOP_BREAK) == 0) {
 				currentTime = HawkTime.getMillisecond();
@@ -550,9 +655,9 @@ public abstract class HawkApp extends HawkAppObj {
 				} catch (Exception e) {
 					HawkException.catchException(e);
 				}
-				
+
 				HawkOSOperator.osSleep(appCfg.tickPeriod);
-			}			
+			}
 			onClosed();
 			running = false;
 			HawkLog.logPrintln("hawk main loop exit");
@@ -570,14 +675,14 @@ public abstract class HawkApp extends HawkAppObj {
 		if (!HawkNativeApi.tickHawk()) {
 			return false;
 		}
-		
+
 		// tick对象的更新
 		for (HawkTickable tickable : tickables) {
 			if (tickable.isTickable()) {
 				tickable.onTick();
 			}
 		}
-		
+
 		// 对象管理器的更新(每小时一个周期)
 		if (currentTime - lastRemoveObjTime >= 3600000) {
 			lastRemoveObjTime = currentTime;
@@ -597,33 +702,24 @@ public abstract class HawkApp extends HawkAppObj {
 				}
 			}
 		}
-		
+
 		// 对象更新
 		for (Entry<Integer, HawkObjManager<HawkXID, HawkAppObj>> entry : objMans.entrySet()) {
 			HawkObjManager<HawkXID, HawkAppObj> objMan = entry.getValue();
 			if (objMan != null) {
-				if (appCfg.isMsgTaskMode()) {
-					objXidList.clear();
-					if (objMan.collectObjKey(objXidList, null) > 0) {
-						postTick(objXidList);
-					}
-				} else {
-					appObjList.clear();
-					objMan.collectObjValue(appObjList, null);
-					for (HawkAppObj appObj : appObjList) {
-						if (appObj != this) {
-							appObj.onTick();
-						}
-					}
+				objXidList.clear();
+				if (objMan.collectObjKey(objXidList, null) > 0) {
+					postTick(objXidList);
 				}
 			}
 		}
-		
+
 		return super.onTick();
 	}
 
 	/**
 	 * 移除超时应用对象
+	 * 
 	 * @param appObj
 	 */
 	protected void onRemoveTimeoutObj(HawkAppObj appObj) {
@@ -642,13 +738,13 @@ public abstract class HawkApp extends HawkAppObj {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * 程序被关闭时的回调
 	 */
 	public void onShutdown() {
 		breakLoop();
-		
+
 		// 等待循环状态
 		while ((loopState & LOOP_CLOSED) != LOOP_CLOSED) {
 			HawkOSOperator.sleep();
@@ -666,21 +762,21 @@ public abstract class HawkApp extends HawkAppObj {
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
-			
+
 			try {
 				// 停止定时器管理器
 				HawkTimerManager.getInstance().stop();
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
-			
+
 			try {
 				// 停止数据库
 				HawkDBManager.getInstance().stop();
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
-			
+
 			try {
 				// 等待消息线程结束
 				if (msgExecutor != null) {
@@ -689,7 +785,7 @@ public abstract class HawkApp extends HawkAppObj {
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
-			
+
 			try {
 				// 等待任务线程池结束
 				if (taskExecutor != null) {
@@ -698,21 +794,21 @@ public abstract class HawkApp extends HawkAppObj {
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
-			
+
 			try {
 				// 关闭脚本管理器
 				HawkScriptManager.getInstance().close();
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
-			
+
 			try {
 				// 关闭数据库
 				HawkDBManager.getInstance().close();
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
-			
+
 		} finally {
 			// 设置关闭状态
 			loopState |= LOOP_CLOSED;
@@ -738,7 +834,7 @@ public abstract class HawkApp extends HawkAppObj {
 	protected HawkObjManager<HawkXID, HawkAppObj> createObjMan(int type) {
 		HawkObjManager<HawkXID, HawkAppObj> objMan = getObjMan(type);
 		if (objMan == null) {
-			objMan = new HawkObjManager<HawkXID, HawkAppObj>(appCfg.isMsgTaskMode());
+			objMan = new HawkObjManager<HawkXID, HawkAppObj>(true);
 			objMans.put(type, objMan);
 		}
 		return objMan;
@@ -808,11 +904,7 @@ public abstract class HawkApp extends HawkAppObj {
 		if (xid != null && xid.isValid()) {
 			HawkObjManager<HawkXID, HawkAppObj> objMan = objMans.get(xid.getType());
 			if (objMan != null) {
-				HawkObjBase<HawkXID, HawkAppObj> objBase = objMan.queryObject(xid);
-				if (objBase != null) {
-					objBase.lockObj();
-					return objBase;
-				}
+				return objMan.lockObject(xid);
 			}
 		}
 		return null;
@@ -861,13 +953,13 @@ public abstract class HawkApp extends HawkAppObj {
 		}
 		return false;
 	}
-	
+
 	/**
 	 * 投递任务到消息线程组
 	 * 
 	 * @param task
 	 * @return
-	 * @throws Exception 
+	 * @throws Exception
 	 */
 	public boolean postMsgTask(HawkMsgTask task) {
 		if (running && task != null) {
@@ -876,7 +968,7 @@ public abstract class HawkApp extends HawkAppObj {
 		}
 		return false;
 	}
-	
+
 	/**
 	 * 投递任务到消息线程组
 	 * 
@@ -900,12 +992,8 @@ public abstract class HawkApp extends HawkAppObj {
 	 */
 	public boolean postProtocol(HawkXID xid, HawkProtocol protocol) {
 		if (running && xid != null && protocol != null) {
-			if (appCfg.isMsgTaskMode()) {
-				int threadIdx = xid.getHashThread(getThreadNum());
-				return postMsgTask(HawkProtoTask.valueOf(xid, protocol), threadIdx);
-			} else {
-				return dispatchProto(xid, protocol);
-			}
+			int threadIdx = xid.getHashThread(getThreadNum());
+			return postMsgTask(HawkProtoTask.valueOf(xid, protocol), threadIdx);
 		}
 		return false;
 	}
@@ -933,17 +1021,13 @@ public abstract class HawkApp extends HawkAppObj {
 	 */
 	public boolean postMsg(HawkMsg msg) {
 		if (running && msg != null) {
-			if (appCfg.isMsgTaskMode()) {
-				int threadIdx = msg.getTarget().getHashThread(getThreadNum());
-				
-				if (HawkApp.getInstance().getAppCfg().isDebug()) {
-					HawkLog.logPrintln(String.format("post message: %d, target: %s, thread: %d", msg.getMsg(), msg.getTarget().toString(), threadIdx));
-				}
-				
-				return postMsgTask(HawkMsgTask.valueOf(msg.getTarget(), msg), threadIdx);
-			} else {
-				return dispatchMsg(msg.getTarget(), msg);
+			int threadIdx = msg.getTarget().getHashThread(getThreadNum());
+			if (HawkApp.getInstance().getAppCfg().isDebug()) {
+				HawkLog.logPrintln(String.format("post message: %d, target: %s, thread: %d", msg.getMsg(), msg.getTarget().toString(), threadIdx));
 			}
+			HawkMsgTask hawkMsgTask = HawkMsgTask.valueOf(msg.getTarget(), msg);
+			hawkMsgTask.setMustRun(true);
+			return postMsgTask(hawkMsgTask, threadIdx);
 		}
 		return false;
 	}
@@ -957,27 +1041,21 @@ public abstract class HawkApp extends HawkAppObj {
 	 */
 	public boolean postMsg(Collection<HawkXID> xidList, HawkMsg msg) {
 		if (running && xidList != null && xidList.size() > 0 && msg != null) {
-			if (appCfg.isMsgTaskMode()) {
-				Map<Integer, List<HawkXID>> threadXidMap = new HashMap<Integer, List<HawkXID>>();
-				// 计算xid列表所属线程
-				for (HawkXID xid : xidList) {
-					int threadIdx = xid.getHashThread(getThreadNum());
-					List<HawkXID> threadXidList = threadXidMap.get(threadIdx);
-					if (threadXidList == null) {
-						threadXidList = new LinkedList<HawkXID>();
-						threadXidMap.put(threadIdx, threadXidList);
-					}
-					threadXidList.add(xid);
+			Map<Integer, List<HawkXID>> threadXidMap = new HashMap<Integer, List<HawkXID>>();
+			// 计算xid列表所属线程
+			for (HawkXID xid : xidList) {
+				int threadIdx = xid.getHashThread(getThreadNum());
+				List<HawkXID> threadXidList = threadXidMap.get(threadIdx);
+				if (threadXidList == null) {
+					threadXidList = new LinkedList<HawkXID>();
+					threadXidMap.put(threadIdx, threadXidList);
 				}
-	
-				// 按线程投递消息
-				for (Map.Entry<Integer, List<HawkXID>> entry : threadXidMap.entrySet()) {
-					postMsgTask(HawkMsgTask.valueOf(entry.getValue(), msg), entry.getKey());
-				}
-			} else {
-				for (HawkXID xid : xidList) {
-					dispatchMsg(xid, msg);
-				}
+				threadXidList.add(xid);
+			}
+
+			// 按线程投递消息
+			for (Map.Entry<Integer, List<HawkXID>> entry : threadXidMap.entrySet()) {
+				postMsgTask(HawkMsgTask.valueOf(entry.getValue(), msg), entry.getKey());
 			}
 			return true;
 		}
@@ -992,41 +1070,33 @@ public abstract class HawkApp extends HawkAppObj {
 	 */
 	public boolean postTick(Collection<HawkXID> xidList) {
 		if (running && xidList != null && xidList.size() > 0) {
-			if (appCfg.isMsgTaskMode()) {
-				// 先创建线程tick表
-				if (threadTickXids == null) {
-					threadTickXids = new HashMap<Integer, List<HawkXID>>();
-					for (int i = 0; i < getThreadNum(); i++) {
-						threadTickXids.put(i, new LinkedList<HawkXID>());
-					}
-				} else {
-					for (int i = 0; i < getThreadNum(); i++) {
-						threadTickXids.get(i).clear();
-					}
-				}
-	
-				if (xidList != null && xidList.size() > 0) {
-					// 计算xid列表所属线程
-					for (HawkXID xid : xidList) {
-						int threadIdx = xid.getHashThread(getThreadNum());
-						// app对象本身不参与线程tick更新计算, 本身的tick在主线程执行
-						if (!xid.equals(this.objXid)) {
-							threadTickXids.get(threadIdx).add(xid);
-						}
-					}
-	
-					// 按线程投递消息
-					for (Map.Entry<Integer, List<HawkXID>> entry : threadTickXids.entrySet()) {
-						if (entry.getValue().size() > 0) {
-							// 不存在即创建
-							postMsgTask(HawkTickTask.valueOf(entry.getValue()), entry.getKey());
-						}
-					}
+			// 先创建线程tick表
+			if (threadTickXids == null) {
+				threadTickXids = new HashMap<Integer, List<HawkXID>>();
+				for (int i = 0; i < getThreadNum(); i++) {
+					threadTickXids.put(i, new LinkedList<HawkXID>());
 				}
 			} else {
+				for (int i = 0; i < getThreadNum(); i++) {
+					threadTickXids.get(i).clear();
+				}
+			}
+
+			if (xidList != null && xidList.size() > 0) {
+				// 计算xid列表所属线程
 				for (HawkXID xid : xidList) {
+					int threadIdx = xid.getHashThread(getThreadNum());
+					// app对象本身不参与线程tick更新计算, 本身的tick在主线程执行
 					if (!xid.equals(this.objXid)) {
-						dispatchTick(xid);
+						threadTickXids.get(threadIdx).add(xid);
+					}
+				}
+
+				// 按线程投递消息
+				for (Map.Entry<Integer, List<HawkXID>> entry : threadTickXids.entrySet()) {
+					if (entry.getValue().size() > 0) {
+						// 不存在即创建
+						postMsgTask(HawkTickTask.valueOf(entry.getValue()), entry.getKey());
 					}
 				}
 			}
@@ -1097,10 +1167,16 @@ public abstract class HawkApp extends HawkAppObj {
 					try {
 						if (objBase.isObjValid()) {
 							objBase.setVisitTime(currentTime);
-							HawkInterceptHandler interceptHandler = getInterceptHandler(objBase.getImpl().getClass().getName());
-							if (interceptHandler != null && interceptHandler.onProtocol(objBase.getImpl(), protocol)) {
-								return true;
+							
+							try {
+								HawkInterceptHandler interceptHandler = getInterceptHandler(objBase.getImpl().getClass().getName());
+								if (interceptHandler != null && interceptHandler.onProtocol(objBase.getImpl(), protocol)) {
+									return true;
+								}
+							} catch (Exception e) {
+								HawkException.catchException(e);
 							}
+							
 							return objBase.getImpl().onProtocol(protocol);
 						}
 					} catch (Exception e) {
@@ -1126,7 +1202,7 @@ public abstract class HawkApp extends HawkAppObj {
 	 * @param xid
 	 * @param msg
 	 * @return
-	 * @throws Exception 
+	 * @throws Exception
 	 */
 	public boolean dispatchMsg(HawkXID xid, HawkMsg msg) {
 		if (xid != null && msg != null) {
@@ -1134,16 +1210,22 @@ public abstract class HawkApp extends HawkAppObj {
 				if (HawkApp.getInstance().getAppCfg().isDebug()) {
 					HawkLog.logPrintln(String.format("dispatch message: %d, target: %s", msg.getMsg(), xid.toString()));
 				}
-				
+
 				HawkObjBase<HawkXID, HawkAppObj> objBase = lockObject(xid);
 				if (objBase != null) {
 					long beginTimeMs = HawkTime.getMillisecond();
 					try {
 						if (objBase.isObjValid()) {
-							HawkInterceptHandler interceptHandler = getInterceptHandler(objBase.getImpl().getClass().getName());
-							if (interceptHandler != null && interceptHandler.onMessage(objBase.getImpl(), msg)) {
-								return true;
+							
+							try {
+								HawkInterceptHandler interceptHandler = getInterceptHandler(objBase.getImpl().getClass().getName());
+								if (interceptHandler != null && interceptHandler.onMessage(objBase.getImpl(), msg)) {
+									return true;
+								}
+							} catch (Exception e) {
+								HawkException.catchException(e);
 							}
+							
 							return objBase.getImpl().onMessage(msg);
 						}
 					} catch (Exception e) {
@@ -1168,7 +1250,7 @@ public abstract class HawkApp extends HawkAppObj {
 	 * 
 	 * @param xid
 	 * @return
-	 * @throws Exception 
+	 * @throws Exception
 	 */
 	public boolean dispatchTick(HawkXID xid) {
 		if (xid != null) {
@@ -1177,10 +1259,16 @@ public abstract class HawkApp extends HawkAppObj {
 				if (objBase != null) {
 					try {
 						if (objBase.isObjValid()) {
-							HawkInterceptHandler interceptHandler = getInterceptHandler(objBase.getImpl().getClass().getName());
-							if (interceptHandler != null && interceptHandler.onTick(objBase.getImpl())) {
-								return true;
+							
+							try {
+								HawkInterceptHandler interceptHandler = getInterceptHandler(objBase.getImpl().getClass().getName());
+								if (interceptHandler != null && interceptHandler.onTick(objBase.getImpl())) {
+									return true;
+								}
+							} catch (Exception e) {
+								HawkException.catchException(e);
 							}
+							
 							return objBase.getImpl().onTick();
 						}
 					} catch (Exception e) {
@@ -1215,12 +1303,7 @@ public abstract class HawkApp extends HawkAppObj {
 	 */
 	public boolean onSessionProtocol(HawkSession session, HawkProtocol protocol) {
 		if (running && session != null && protocol != null && session.getAppObject() != null) {
-			if (appCfg.isMsgTaskMode()) {
-				return postProtocol(session.getAppObject().getXid(), protocol);
-			} else {
-				session.getAppObject().onProtocol(protocol);
-				return true;
-			}
+			return postProtocol(session.getAppObject().getXid(), protocol);
 		}
 		return false;
 	}
@@ -1249,5 +1332,32 @@ public abstract class HawkApp extends HawkAppObj {
 	 * @param e
 	 */
 	public void reportException(Exception e) {
+	}
+
+	/**
+	 * 聊天控制器发过来消息
+	 * 
+	 * @param msg
+	 */
+	public void onChatMonitorNotify(String msg) {
+	}
+
+	/**
+	 * 订单服务器通知(订单生成, 订单发货)
+	 * 
+	 * @param jsonInfo
+	 *            (action字段区分通知数据类型, 具体参考HawkOrderService的action定义)
+	 */
+	public void onOrderNotify(JSONObject jsonInfo) {
+	}
+	
+	/**
+	 * ip服务拒绝连接
+	 * 
+	 * @param ip
+	 * @param usage
+	 */
+	public boolean onRefuseByIptables(IoSession session, String ip, int usage) {
+		return false;
 	}
 }

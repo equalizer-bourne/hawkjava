@@ -19,11 +19,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import org.hawk.app.HawkApp;
 import org.hawk.cryption.HawkMd5;
 import org.hawk.log.HawkLog;
 import org.hawk.nativeapi.HawkNativeApi;
 import org.hawk.os.HawkException;
+import org.hawk.os.HawkOSOperator;
 
 /**
  * 所有服务对象管理器
@@ -105,7 +105,7 @@ public class HawkServiceManager {
 	 * @return
 	 */
 	private String getClassFilePath() {
-		return HawkApp.getInstance().getWorkPath() + "service" + File.separator;
+		return HawkOSOperator.getWorkPath() + "service" + File.separator;
 	}
 
 	/**

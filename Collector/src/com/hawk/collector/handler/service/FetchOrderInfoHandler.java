@@ -44,7 +44,7 @@ public class FetchOrderInfoHandler implements HttpHandler {
 	public static String doFetch(String game, String orderid) {
 		Statement statement = null;
 		try {
-			String sql = String.format("SELECT platform, server, puid, pay, currency, time FROM recharge WHERE game = '%s' AND orderid = '%s'", game, orderid);
+			String sql = String.format("SELECT platform, server, puid, orderMoney, payMoney, addGold, giftGold, currency, time FROM recharge WHERE game = '%s' AND pforder = '%s'", game, orderid);
 
 			statement = DBManager.getInstance().createStatement(game);
 			ResultSet resultSet = statement.executeQuery(sql);
@@ -55,7 +55,10 @@ public class FetchOrderInfoHandler implements HttpHandler {
 				jsonObject.addProperty("platform", resultSet.getString(++column));
 				jsonObject.addProperty("server", resultSet.getString(++column));
 				jsonObject.addProperty("puid", resultSet.getString(++column));
+				jsonObject.addProperty("orderMoney", resultSet.getInt(++column));
 				jsonObject.addProperty("pay", resultSet.getInt(++column));
+				jsonObject.addProperty("addGold", resultSet.getInt(++column));
+				jsonObject.addProperty("giftGold", resultSet.getInt(++column));
 				jsonObject.addProperty("currency", resultSet.getString(++column));
 				SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 				jsonObject.addProperty("time", sdf.format(resultSet.getTimestamp(++column)));

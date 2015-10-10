@@ -91,15 +91,15 @@ public class HawkOctetsStream {
 	 *            是否是本地堆
 	 * @return
 	 */
-	public static HawkOctetsStream create(byte[] bytes, boolean isDirect) {
+	public static HawkOctetsStream create(byte[] bytes, int offset, int length, boolean isDirect) {
 		HawkOctetsStream os = new HawkOctetsStream();
 		os.isDirect = isDirect;
 		if (isDirect) {
-			os.byteBuffer = ByteBuffer.allocateDirect(bytes.length);
+			os.byteBuffer = ByteBuffer.allocateDirect(length);
 		} else {
-			os.byteBuffer = ByteBuffer.allocate(bytes.length);
+			os.byteBuffer = ByteBuffer.allocate(length);
 		}
-		os.byteBuffer.put(bytes);
+		os.byteBuffer.put(bytes, offset, length);
 		os.byteBuffer.flip();
 		return os;
 	}

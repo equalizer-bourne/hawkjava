@@ -44,12 +44,12 @@ public class HawkLog {
 	 */
 	public synchronized static void debugPrintln(String msg) {
 		if (HawkApp.getInstance().isDebug()) {
-			debugLogger.info(msg);
-			
 			// 控制台输出
 			if (consolePrint) {
 				System.out.println(msg);
 			}
+			
+			debugLogger.info(msg);
 		}
 	}
 	
@@ -59,12 +59,12 @@ public class HawkLog {
 	 * @param msg
 	 */
 	public synchronized static void logPrintln(String msg) {
-		logger.info(msg);
-		
 		// 控制台输出
 		if (consolePrint) {
 			System.out.println(msg);
 		}
+		
+		logger.info(msg);
 	}
 
 	/**
@@ -73,10 +73,10 @@ public class HawkLog {
 	 * @param msg
 	 */
 	public synchronized static void errPrintln(String msg) {
-		logger.error(msg);
-		
 		// 打印错误
 		System.err.println(msg);
+				
+		logger.error(msg);
 	}
 
 	/**

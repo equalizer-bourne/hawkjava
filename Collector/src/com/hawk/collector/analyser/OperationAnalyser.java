@@ -318,7 +318,7 @@ public class OperationAnalyser {
 			
 			// 总充值设备数
 			{
-				String totalPayDeviceSql = "select count(device) from recharge where date <= '" + date + "'";
+				String totalPayDeviceSql = "select count(distinct device) from recharge where date <= '" + date + "'";
 				if (platform != null && platform.length() > 0) {
 					totalPayDeviceSql += " and platform = '" + platform +"'";
 				}
@@ -356,7 +356,7 @@ public class OperationAnalyser {
 			
 			// 总充值额
 			{
-				String totalPayMoneySql = "select sum(pay) from recharge where date <= '" + date + "'";
+				String totalPayMoneySql = "select sum(payMoney) from recharge where date <= '" + date + "'";
 				if (platform != null && platform.length() > 0) {
 					totalPayMoneySql += " and platform = '" + platform +"'";
 				}
@@ -375,7 +375,7 @@ public class OperationAnalyser {
 			
 			// 当日充值额
 			{
-				String payMoneySql = "select sum(pay) from recharge where date = '" + date + "'";
+				String payMoneySql = "select sum(payMoney) from recharge where date = '" + date + "'";
 				if (platform != null && platform.length() > 0) {
 					payMoneySql += " and platform = '" + platform +"'";
 				}
@@ -483,14 +483,22 @@ public class OperationAnalyser {
 			ltvCalendar.add(Calendar.DAY_OF_YEAR, day);
 			String ltvDay = sdf.format(ltvCalendar.getTime());
 			
-			String ltvSql = String.format("select sum(pay) from recharge where date >= '%s' and date < '%s'", date, ltvDay);
+			String ltvSql = String.format("select sum(payMoney) from recharge where date >= '%s' and date < '%s'", date, ltvDay);
 			if (platform != null && platform.length() > 0) {
 				ltvSql += " and platform = '" + platform +"'";
 			}
 			if (channel != null && channel.length() > 0) {
 				ltvSql += " and channel = '" + channel +"'";
 			}
-			ltvSql += " and (select count(puid) from register where register.date = '" + date +"' and register.puid = recharge.puid limit 1) > 0";
+			
+			ltvSql += " and (select count(puid) from puid where puid.date = '" + date +"' and puid.puid = recharge.puid";
+			if (platform != null && platform.length() > 0) {
+				ltvSql += " and puid.platform = '" + platform +"'";
+			}
+			if (channel != null && channel.length() > 0) {
+				ltvSql += " and puid.channel = '" + channel +"'";
+			}
+			ltvSql += " limit 1) > 0";
 			
 			HawkLog.logPrintln(ltvSql);
 			ResultSet resultSet = statement.executeQuery(ltvSql);
@@ -524,7 +532,15 @@ public class OperationAnalyser {
 			if (channel != null && channel.length() > 0) {
 				retentionSql += " and channel = '" + channel +"'";
 			}
-			retentionSql += String.format(" and (select count(puid) from register where register.date = '%s' and register.puid = login.puid limit 1) > 0", date);
+			
+			retentionSql += String.format(" and (select count(puid) from puid where puid.date = '%s' and puid.puid = login.puid", date);
+			if (platform != null && platform.length() > 0) {
+				retentionSql += " and puid.platform = '" + platform +"'";
+			}
+			if (channel != null && channel.length() > 0) {
+				retentionSql += " and puid.channel = '" + channel +"'";
+			}
+			retentionSql += " limit 1) > 0";
 			
 			HawkLog.logPrintln(retentionSql);
 			resultSet = statement.executeQuery(retentionSql);
@@ -553,13 +569,21 @@ public class OperationAnalyser {
 			String targetDay = sdf.format(targetCalendar.getTime());
 			
 			String retentionSql = "select count(distinct device) from login where date = '" + targetDay + "'";
-			if (retentionSql != null && platform.length() > 0) {
+			if (platform != null && platform.length() > 0) {
 				retentionSql += " and platform = '" + platform +"'";
 			}
 			if (channel != null && channel.length() > 0) {
 				retentionSql += " and channel = '" + channel +"'";
 			}
-			retentionSql += String.format(" and (select count(device) from device where device.date = '%s' and device.device = login.device  limit 1) > 0", date);
+			
+			retentionSql += String.format(" and (select count(device) from device where device.date = '%s' and device.device = login.device", date);
+			if (platform != null && platform.length() > 0) {
+				retentionSql += " and device.platform = '" + platform +"'";
+			}
+			if (channel != null && channel.length() > 0) {
+				retentionSql += " and device.channel = '" + channel +"'";
+			}
+			retentionSql += " limit 1) > 0";
 			
 			HawkLog.logPrintln(retentionSql);
 			resultSet = statement.executeQuery(retentionSql);

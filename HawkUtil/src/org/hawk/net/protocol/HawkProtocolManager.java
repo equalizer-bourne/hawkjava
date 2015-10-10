@@ -95,7 +95,7 @@ public class HawkProtocolManager {
 	 * @param builder
 	 */
 	public void logProtocolBuilder(HawkProtocol protocol, Object builder) {
-		if (builder != null && HawkApp.getInstance().isDebug()) {
+		if (HawkApp.getInstance() != null && builder != null && HawkApp.getInstance().isDebug()) {
 			logger.info("protocol: {}, size: {}, crc: {}, pb: \r\n{}", new Object[] { protocol.getType(), protocol.getSize(), protocol.getCrc(), builder.toString()} ); 
 		}
 	}

@@ -13,12 +13,10 @@ import org.hawk.cryption.HawkEncryption;
 import org.hawk.log.HawkLog;
 import org.hawk.net.protocol.HawkProtocol;
 import org.hawk.os.HawkException;
-import org.hawk.os.HawkOSOperator;
 import org.hawk.security.HawkSecurity;
 
 import com.google.gson.JsonObject;
 import com.googlecode.protobuf.format.JsonFormat;
-import com.sun.net.httpserver.HttpExchange;
 
 /**
  * 封装的框架会话对象
@@ -91,10 +89,6 @@ public class HawkSession {
 	 * 实际会话对象
 	 */
 	protected IoSession session;
-	/**
-	 * http会话对象
-	 */
-	protected HttpExchange httpExchange;
 	/**
 	 * 协议基数号
 	 */
@@ -202,15 +196,6 @@ public class HawkSession {
 	 */
 	public IoSession getIoSession() {
 		return this.session;
-	}
-	
-	/**
-	 * 获取真实的http会话
-	 * 
-	 * @return
-	 */
-	public HttpExchange getHttpExchange() {
-		return httpExchange;
 	}
 	
 	/**
@@ -369,7 +354,7 @@ public class HawkSession {
 	 * @param protocol
 	 * @return
 	 */
-	public boolean sendProtocol(HawkProtocol protocol) {
+	public synchronized boolean sendProtocol(HawkProtocol protocol) {
 		if (isActive() && protocol != null) {
 			try {
 				// 文本模式的websession发送协议
@@ -379,11 +364,6 @@ public class HawkSession {
 					jsonObject.addProperty("type", protocol.getType());
 					jsonObject.addProperty("protocol", pbJson);
 					return sendMessage(jsonObject.toString());
-				}
-				
-				// 回复http协议
-				if (httpExchange != null) {
-					return false;
 				}
 				
 				// 二进制模式协议发送
@@ -405,14 +385,11 @@ public class HawkSession {
 	 * @param message
 	 * @return
 	 */
-	public boolean sendMessage(Object message) {
+	public synchronized boolean sendMessage(Object message) {
 		if (isActive() && message != null) {
 			try {
 				if (session != null) {
 					session.write(message);
-					return true;
-				} else if (httpExchange != null) {
-					HawkOSOperator.sendHttpResponse(httpExchange, message.toString());
 					return true;
 				}
 			} catch (Exception e) {
@@ -456,7 +433,6 @@ public class HawkSession {
 		this.decryption = null;
 		this.appObj = null;
 		this.session = null;
-		this.httpExchange = null;
 		return true;
 	}
 
@@ -473,60 +449,37 @@ public class HawkSession {
 		inBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
 		outBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
 		
-		// 设置读取数据的缓冲区大小
-		this.session.getConfig().setReadBufferSize(HawkNetManager.getInstance().getSessionBufSize());
-		// 读写通道无操作进入空闲状态
-		if (!HawkApp.getInstance().getAppCfg().isDebug()) {
-			this.session.getConfig().setIdleTime(IdleStatus.BOTH_IDLE, HawkNetManager.getInstance().getSessionIdleTime());
-		}
-		
+		// 设置激活状态
+		this.active = true;
+				
 		// 加解密组件
 		if (HawkNetManager.getInstance().enableEncryption()) {
 			setEncryption(new HawkEncryption());
 			setDecryption(new HawkDecryption());
 		}
-
-		// 绑定本地会话对象
-		this.session.setAttribute(HawkSession.SESSION_ATTR, this);
-		// 设置激活状态
-		this.active = true;
 		
-		try {
-			// 获取ip地址
-			this.ipAddr = this.session.getRemoteAddress().toString().split(":")[0].substring(1);
-		} catch (Exception e) {
-			HawkException.catchException(e);
+		if (this.session != null) {
+			// 设置读取数据的缓冲区大小
+			this.session.getConfig().setReadBufferSize(HawkNetManager.getInstance().getSessionBufSize());
+			// 读写通道无操作进入空闲状态
+			if (!HawkApp.getInstance().getAppCfg().isDebug()) {
+				this.session.getConfig().setIdleTime(IdleStatus.BOTH_IDLE, HawkNetManager.getInstance().getSessionIdleTime());
+			}
+			
+			// 绑定本地会话对象
+			this.session.setAttribute(HawkSession.SESSION_ATTR, this);
+			
+			try {
+				// 获取ip地址
+				this.ipAddr = this.session.getRemoteAddress().toString().split(":")[0].substring(1);
+			} catch (Exception e) {
+				HawkException.catchException(e);
+			}
 		}
 		// 通知会话开启
 		return HawkApp.getInstance().onSessionOpened(this);
 	}
 
-	/**
-	 * 会话开启
-	 * 
-	 * @param httpExchange
-	 */
-	public boolean onOpened(HttpExchange httpExchange) {
-		this.httpExchange = httpExchange;
-		
-		// 创建tcp会话需要的数据
-		sessionLock = new ReentrantLock();
-		inBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
-		outBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
-		
-		// 设置激活状态
-		this.active = true;
-		
-		try {
-			// 获取ip地址
-			this.ipAddr = httpExchange.getRemoteAddress().toString().split(":")[0].substring(1);
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		}
-		// 通知会话开启
-		return HawkApp.getInstance().onSessionOpened(this);
-	}
-	
 	/**
 	 * 会话接收到消息
 	 * 
@@ -558,7 +511,7 @@ public class HawkSession {
 			
 			// 协议是否处理
 			if (!HawkApp.getInstance().onSessionProtocol(this, protocol)) {
-				// 协议为被注册处理器处理, 直接视为无效协议
+				// 协议未被注册处理器处理, 直接视为无效协议
 				HawkLog.logPrintln(String.format("session protocol handle closed, ipaddr: %s, protocol: %d", getIpAddr(), protocol.getType()));
 				close(false);
 				return false;

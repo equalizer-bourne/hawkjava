@@ -61,7 +61,7 @@ public class CdkHttpServer {
 	public void setup(String addr, int port, int pool) {
 		try {
 			if (addr != null && addr.length() > 0) {
-				httpServer = HttpServer.create(new InetSocketAddress(addr, port), 0);				
+				httpServer = HttpServer.create(new InetSocketAddress(addr, port), 100);				
 				// TODO: 暂时不支持多线程(若以后性能不足, 及时修改)
 				httpServer.setExecutor(Executors.newFixedThreadPool(1));
 

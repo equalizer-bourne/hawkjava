@@ -1,6 +1,7 @@
 package org.hawk.timer;
 
 import org.hawk.os.HawkException;
+import org.hawk.os.HawkTime;
 
 /**
  * 管理闹钟触发的线程，暴露的方法均是synchronized
@@ -77,13 +78,13 @@ public class HawkAlarmWaiter implements Runnable {
 				if (sleepUntil <= 0) {
 					wait();
 				} else {
-					long timeout = sleepUntil - System.currentTimeMillis();
+					long timeout = sleepUntil - HawkTime.getMillisecond();
 					if (timeout > 0) {
 						wait(timeout);
 					}
 				}
 
-				if (sleepUntil >= 0 && (sleepUntil - System.currentTimeMillis() < 1000)) {
+				if (sleepUntil >= 0 && (sleepUntil - HawkTime.getMillisecond() < 1000)) {
 					sleepUntil = -1;
 					timerManager.ringNextAlarm();
 				}

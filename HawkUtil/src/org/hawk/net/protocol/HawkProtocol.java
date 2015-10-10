@@ -5,12 +5,12 @@ import java.nio.ByteBuffer;
 import net.sf.json.JSONObject;
 
 import org.apache.mina.core.buffer.IoBuffer;
-import org.hawk.cache.HawkCache;
 import org.hawk.cache.HawkCacheObj;
 import org.hawk.net.HawkSession;
 import org.hawk.octets.HawkOctetsStream;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkOSOperator;
+import org.hawk.util.HawkZlib;
 
 import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.GeneratedMessage.Builder;
@@ -26,10 +26,6 @@ public class HawkProtocol extends HawkCacheObj {
 	 * 协议头字节数
 	 */
 	public static final int HEADER_SIZE = 16;
-	/**
-	 * 缓存对象
-	 */
-	private static HawkCache protocolCache = null;
 	
 	/*
 	 * 协议头格式
@@ -99,33 +95,11 @@ public class HawkProtocol extends HawkCacheObj {
 	private Object parseObj;
 	
 	/**
-	 * 设置对象缓存
-	 * @param cache
-	 */
-	public static void setCache(HawkCache cache) {
-		protocolCache = cache;
-	}
-	
-	/**
-	 * 释放对象
-	 * @param protocol
-	 */
-	public static void release(HawkProtocol protocol) {
-		if (protocolCache != null) {
-			protocol.clear();
-			protocolCache.release(protocol);
-		}
-	}
-	
-	/**
 	 * 静态构建
 	 * 
 	 * @return
 	 */
 	public static HawkProtocol valueOf() {
-		if (protocolCache != null) {
-			return protocolCache.create();
-		}
 		return new HawkProtocol();
 	}
 	
@@ -136,9 +110,7 @@ public class HawkProtocol extends HawkCacheObj {
 	 * @return
 	 */
 	public static HawkProtocol valueOf(int type) {
-		HawkProtocol protocol = valueOf();
-		protocol.setType(type);
-		return protocol;
+		return new HawkProtocol(type);
 	}
 
 	/**
@@ -484,6 +456,32 @@ public class HawkProtocol extends HawkCacheObj {
 	}
 
 	/**
+	 * 协议打包: type + size + reserve + crc + data
+	 * 
+	 * @param buffer
+	 * @return
+	 */
+	public IoBuffer encode() {
+		// 协议编码
+		try {
+			IoBuffer buffer = IoBuffer.allocate(octets.remaining() + HEADER_SIZE).setAutoExpand(true);
+			
+			// 有效协议头
+			buffer.putInt(header.type);
+			buffer.putInt(header.size);
+			buffer.putInt(header.reserve);
+			buffer.putInt(header.crc);
+			if (header.size > 0) {
+				buffer.put(octets.getBuffer().array(), octets.position(), octets.remaining());
+			}
+			return buffer.flip();
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return null;
+	}
+	
+	/**
 	 * 协议解包
 	 * 
 	 * @param os
@@ -639,18 +637,20 @@ public class HawkProtocol extends HawkCacheObj {
 	 * 写缓冲区
 	 * 
 	 * @param bytes
+	 * @param offset
+	 * @param length
 	 * @return
 	 */
-	public boolean writeOctets(byte[] bytes) {
+	public boolean writeOctets(byte[] bytes, int offset, int length) {
 		if (bytes == null) {
 			return true;
 		}
 
 		try {
 			if (octets == null) {
-				octets = HawkOctetsStream.create(bytes, false);
+				octets = HawkOctetsStream.create(bytes, offset, length, false);
 			} else {
-				octets.clear().pushBytes(bytes).flip();
+				octets.clear().pushBytes(bytes, offset, length).flip();
 			}
 			calcOctets();
 			return true;
@@ -660,6 +660,16 @@ public class HawkProtocol extends HawkCacheObj {
 		return false;
 	}
 
+	/**
+	 * 写缓冲区
+	 * 
+	 * @param bytes
+	 * @return
+	 */
+	public boolean writeOctets(byte[] bytes) {
+		return writeOctets(bytes, 0, bytes.length);
+	}
+	
 	/**
 	 * 写缓冲区
 	 * 
@@ -695,6 +705,25 @@ public class HawkProtocol extends HawkCacheObj {
 		}
 	}
 
+	/**
+	 * 协议数据体用zlib压缩
+	 * @return
+	 */
+	public HawkProtocol zlibCompress(int reserveFlag) {
+		try {
+			if (getSize() > 0) {
+				ByteBuffer buffer = getOctets().getBuffer();
+				byte[] bytes = HawkZlib.zlibDeflate(buffer.array(), buffer.position(), buffer.remaining());
+				writeOctets(bytes);
+				setReserve(reserveFlag);
+			}
+			return this;
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return null;
+	}
+	
 	/**
 	 * 解析协议
 	 * 

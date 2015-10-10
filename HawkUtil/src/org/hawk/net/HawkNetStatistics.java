@@ -1,7 +1,8 @@
 package org.hawk.net;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.hawk.app.HawkApp;
 import org.hawk.log.HawkLog;
 import org.hawk.os.HawkTime;
 import org.hawk.util.HawkTickable;
@@ -10,29 +11,29 @@ import com.google.gson.JsonObject;
 
 public class HawkNetStatistics extends HawkTickable {
 	// 当前会话数
-	protected AtomicInteger curSession;
+	protected AtomicLong curSession;
 	// 峰值会话数
-	protected AtomicInteger peakSession;
+	protected AtomicLong peakSession;
 	// 总接收字节数
-	protected AtomicInteger totalRecvBytes;
+	protected AtomicLong totalRecvBytes;
 	// 总接收协议数
-	protected AtomicInteger totalRecvProto;
+	protected AtomicLong totalRecvProto;
 	// 总发送字节数
-	protected AtomicInteger totalSendBytes;
+	protected AtomicLong totalSendBytes;
 	// 总发送协议数
-	protected AtomicInteger totalSendProto;
+	protected AtomicLong totalSendProto;
 	// 当前接收速率
-	protected int curRecvRate;
+	protected long curRecvRate;
 	// 接收峰值速率(byte/s)
-	protected int peakRecvRate;
+	protected long peakRecvRate;
 	// 当前发送速率
-	protected int curSendRate;
+	protected long curSendRate;
 	// 发送峰值速率(byte/s)
-	protected int peakSendRate;
+	protected long peakSendRate;
 	// 上一秒的总接收字节数
-	private int lastTotalRecvBytes;
+	private long lastTotalRecvBytes;
 	// 上一秒的总发送字节数
-	private int lastTotalSendBytes;
+	private long lastTotalSendBytes;
 	// 速率统计时间
 	private long rateRecordTime;
 	// 信息日志记录时间
@@ -59,17 +60,26 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 构造
 	 */
 	private HawkNetStatistics() {
-		totalSendBytes = new AtomicInteger();
-		totalSendProto = new AtomicInteger();
-		totalRecvBytes = new AtomicInteger();
-		totalRecvProto = new AtomicInteger();
-		curSession = new AtomicInteger();
-		peakSession = new AtomicInteger();
+		totalSendBytes = new AtomicLong();
+		totalSendProto = new AtomicLong();
+		totalRecvBytes = new AtomicLong();
+		totalRecvProto = new AtomicLong();
+		curSession = new AtomicLong();
+		peakSession = new AtomicLong();
 		
 		rateRecordTime = HawkTime.getMillisecond();
 		infoLogTime = HawkTime.getMillisecond();
 	}
 
+	/**
+	 * 初始化
+	 * @return
+	 */
+	public boolean init() {
+		HawkApp.getInstance().addTickable(this);
+		return true;
+	}
+	
 	/**
 	 * 帧更新统计信息
 	 */
@@ -120,7 +130,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 通知会话开启
 	 */
 	public void onSessionCreated() {
-		int value = curSession.incrementAndGet();
+		long value = curSession.incrementAndGet();
 		if (value > peakSession.get()) {
 			peakSession.set(value);
 		}
@@ -138,7 +148,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getCurSession() {
+	public long getCurSession() {
 		return curSession.get();
 	}
 	
@@ -147,7 +157,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getPeakSession() {
+	public long getPeakSession() {
 		return peakSession.get();
 	}
 	
@@ -188,7 +198,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getTotalRecvBytes() {
+	public long getTotalRecvBytes() {
 		return totalRecvBytes.get();
 	}
 
@@ -197,7 +207,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getTotalRecvProto() {
+	public long getTotalRecvProto() {
 		return totalRecvProto.get();
 	}
 
@@ -206,7 +216,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getTotalSendBytes() {
+	public long getTotalSendBytes() {
 		return totalSendBytes.get();
 	}
 
@@ -215,7 +225,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getTotalSendProto() {
+	public long getTotalSendProto() {
 		return totalSendProto.get();
 	}
 
@@ -224,7 +234,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getCurRecvRate() {
+	public long getCurRecvRate() {
 		return curRecvRate;
 	}
 
@@ -233,7 +243,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getPeakRecvRate() {
+	public long getPeakRecvRate() {
 		return peakRecvRate;
 	}
 
@@ -242,7 +252,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getCurSendRate() {
+	public long getCurSendRate() {
 		return curSendRate;
 	}
 
@@ -251,7 +261,7 @@ public class HawkNetStatistics extends HawkTickable {
 	 * 
 	 * @return
 	 */
-	public int getPeakSendRate() {
+	public long getPeakSendRate() {
 		return peakSendRate;
 	}
 }

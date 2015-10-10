@@ -9,6 +9,7 @@ import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
+import org.hawk.app.HawkApp;
 import org.hawk.os.HawkException;
 
 import com.google.gson.JsonObject;
@@ -183,9 +184,14 @@ public class HawkScriptConfig {
 			Document document = saxReader.read(xmlPath);
 			Element rootElement = document.getRootElement();
 
-			this.httpAddr = rootElement.attributeValue("httpAddr");
-			this.baseOutDir = rootElement.attributeValue("baseOutDir");
-			this.baseSrcDir = rootElement.attributeValue("baseSrcDir");
+			if (rootElement.attribute("httpAddr") != null) {
+				httpAddr = rootElement.attributeValue("httpAddr");
+			} else if (HawkApp.getInstance() != null && HawkApp.getInstance().getAppCfg() != null) {
+				httpAddr = "0.0.0.0:" + HawkApp.getInstance().getAppCfg().getScriptPort();
+			}
+			
+			baseOutDir = rootElement.attributeValue("baseOutDir");
+			baseSrcDir = rootElement.attributeValue("baseSrcDir");
 			
 			String basePath = System.getProperty("user.dir");
 			baseOutDir = baseOutDir.replace("${app}", basePath);

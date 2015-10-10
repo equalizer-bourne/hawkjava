@@ -34,22 +34,26 @@ public class HawkObjManager<ObjKey, ObjType> {
 	
 	/**
 	 * 对象过滤器, 外部继承必须实现传入Manager的构造函数
-	   class Filter extends HawkObjManager.InfoFilter{
-			public filter(HawkObjManager objMan) {
-				// InfoFilter的宿主HawkObjManager才可调用自己的super
+		static class Filter<T,V> extends HawkObjManager<T,V>.ObjFilter {
+			public Filter(HawkObjManager<T,V> objMan) {
 				objMan.super();
+			}
+	
+			@Override
+			public boolean doFilter(V obj) {
+				return false;
 			}
 		}
 		
 		// 使用方法
-		HawkObjManager<Integer， Integer> objMan = new HawkObjManager<Integer, Integer>();
-		Filter filter = new Filter(objMan);
+		HawkObjManager<Integer, Integer> objMan = new HawkObjManager<Integer, Integer>(true);
+		Filter<Integer,Integer> filter = new Filter<Integer,Integer>(objMan);
 	 * @author hawk
 	 *
 	 * @param <T>
 	 */
 	public abstract class ObjFilter {
-		abstract boolean doFilter(ObjType obj);
+		public abstract boolean doFilter(ObjType obj);
 	}
 
 	/**
@@ -60,7 +64,7 @@ public class HawkObjManager<ObjKey, ObjType> {
 	 * @param <T>
 	 */
 	public abstract class InfoFilter<T> {
-		abstract boolean doFilter(ObjType obj, Collection<T> infos);
+		public abstract boolean doFilter(ObjType obj, Collection<T> infos);
 	}
 
 	/**
@@ -127,7 +131,7 @@ public class HawkObjManager<ObjKey, ObjType> {
 	}
 
 	/**
-	 * 锁定对象, 必须调用unlockObject释放锁
+	 * 锁定对象, 必须调用unlockObject释放锁(或者objBase调用unlockObj)
 	 * 
 	 * @param key
 	 * @return
@@ -136,6 +140,7 @@ public class HawkObjManager<ObjKey, ObjType> {
 		HawkObjBase<ObjKey, ObjType> objBase = queryObject(key);
 		if (objBase != null) {
 			objBase.lockObj();
+			return objBase;
 		}
 		return null;
 	}

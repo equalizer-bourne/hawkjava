@@ -4,6 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.hawk.delay.HawkDelayAction;
+import org.hawk.delay.HawkDelayManager;
 import org.hawk.listener.HawkListener;
 import org.hawk.log.HawkLog;
 import org.hawk.msg.HawkMsg;
@@ -33,6 +35,10 @@ public class HawkAppObj extends HawkListener {
 	 * 应用对象支持的模块对象
 	 */
 	protected Map<Integer, HawkObjModule> objModules;
+	/**
+	 * 对象延迟队列
+	 */
+	protected HawkDelayManager delayManager;
 	
 	/**
 	 * 应用对象构造
@@ -42,6 +48,7 @@ public class HawkAppObj extends HawkListener {
 	public HawkAppObj(HawkXID xid) {
 		setXid(xid);
 		objModules = new LinkedHashMap<Integer, HawkObjModule>();
+		delayManager = new HawkDelayManager();
 	}
 
 	/**
@@ -95,9 +102,9 @@ public class HawkAppObj extends HawkListener {
 	 * @return
 	 */
 	public boolean sendProtocol(HawkProtocol protocol) {
-		if (session != null && session.isActive()) {
+		if (protocol != null && session != null && session.isActive()) {
+			// 将协议内容格式化成json
 			if (HawkApp.getInstance().getAppCfg().isDebug()) {
-				// 将协议内容格式化成json
 				Message protoBuilder = protocol.getBuilder().build();
 				String protoJson = JsonFormat.printToString(protoBuilder);
 				HawkLog.logPrintln(String.format("send protocol: %d, size: %d, target: %s, protocol: %s",
@@ -151,11 +158,28 @@ public class HawkAppObj extends HawkListener {
 	}
 	
 	/**
+	 * 添加延时行为对象
+	 * 
+	 * @param delayTime
+	 * @param action
+	 */
+	public void addDelayAction(long delayTime, HawkDelayAction action) {
+		if (delayManager != null) {
+			delayManager.addDelayAction(delayTime, action);
+		}
+	}
+	
+	/**
 	 * 更新, 子类在处理自身逻辑后需要调用父类接口
 	 * 
 	 * @return
 	 */
 	public boolean onTick() {
+		// 更新延时对象
+		if (delayManager != null) {
+			delayManager.updateAction();
+		}
+		
 		for (Entry<Integer, HawkObjModule> entry : objModules.entrySet()) {
 			try {
 				entry.getValue().onTick();

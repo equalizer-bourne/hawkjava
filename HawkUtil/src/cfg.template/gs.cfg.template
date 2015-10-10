@@ -1,0 +1,98 @@
+# 游戏名
+gameId = qmby
+
+# 平台名(测试服必须是test)
+platform = test
+
+# 服务器ID
+serverId = 1
+
+# 调试模式
+isDebug = true
+
+# 是否允许控制台打印
+console = false
+
+# 网络接收器端口
+acceptorPort = 9095
+
+# 数据库连接地址
+# dbConnUrl = jdbc:mysql://192.168.199.196:3306/qmby_ios_001
+
+# 数据库连接用户名
+# dbUserName = root
+
+# 数据库连接密码
+# dbPassWord = 123456
+
+# 脚本配置文件
+# scriptXml = script/script.xml
+
+# 脚本端口
+# scriptPort = 5132
+
+# 帧更新周期
+tickPeriod = 50
+
+# 逻辑线程数
+threadNum = 4
+
+# 数据库连接hbm配置
+dbHbmXml = cfg/db.xml
+
+# 数据库异步落地线程周期
+dbAsyncPeriod = 600000
+
+# db操作超时
+dbOpTimeout = 20
+
+# 协议超时
+protoTimeout = 50
+
+# 系统时间差异
+calendarOffset = 0
+
+# 会话缓冲区大小
+sessionBuffSize = 8192
+
+# 会话空闲超时
+sessionIdleTime = 300
+
+# 会话协议频率
+sessionPPS = 0
+
+# 会话加密
+sessionEncryption = false
+
+# 会话数限制
+sessionMaxSize = 0
+
+# 最大注册数
+registerMaxSize = 0
+
+# mina的ioFilter线程数
+ioFilterChain = 0
+
+# 配置文件包名
+# configPackages = com.feefoxes.game.config
+
+# 数据库实体文件包名
+# entityPackages = com.feefoxes.game.entity
+
+# cdk服务地址
+# cdkHost = http://123.59.64.163:9000
+
+# cdk服务超时
+# cdkTimeout = 1000
+
+# 数据上报地址
+# reportHost = http://123.59.64.163:9001
+
+# 数据上报超时时间
+# reportTimeout = 1000
+
+# 订单服务器地址
+# orderAddr = 123.59.62.233:9005
+
+# 本地运维代理端
+# opsAgentAddr = tcp://127.0.0.1:10001

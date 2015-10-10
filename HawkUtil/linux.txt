@@ -1,0 +1,2 @@
+useradd -p password username
+备注: password采用加密命令(openssl password -crypt)

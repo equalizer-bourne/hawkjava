@@ -14,14 +14,20 @@ public class HawkShellExecutor {
 	 */
 	public static String execute(String cmd, long timeout) {
 		try {
-			/*
-			List<String> cmds = new ArrayList<String>();
-			cmds.add("sh");
-			cmds.add("-c");
-			cmds.add(cmd);
-			*/	
+			String[] cmds = null;
+			if (cmd.startsWith("sh -c ")) {
+				cmd = cmd.substring(6).trim();
+				cmds = new String[]{"sh", "-c", cmd};
+			}
+			
 			String line = "";
-			Process process = Runtime.getRuntime().exec(cmd);
+			Process process = null;
+			if (cmds == null) {
+				process = Runtime.getRuntime().exec(cmd);
+			} else {
+				process = Runtime.getRuntime().exec(cmds);
+			}
+			
 			try {
 				// 等待进程退出
 				if (timeout <= 0) {

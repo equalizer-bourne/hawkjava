@@ -60,6 +60,43 @@ public class HawkIoHandler extends IoHandlerAdapter {
 	}
 
 	/**
+	 * 获取ip控制用途
+	 * 
+	 * @return
+	 */
+	public int getIpUsage() {
+		return ipUsage;
+	}
+	
+	/**
+	 * ip检测
+	 * 
+	 * @param session
+	 * @param ipaddr
+	 * @return
+	 */
+	protected boolean checkIptables(IoSession session, String ipaddr) {
+		// 白名单校验
+		if ((ipUsage & IpUsage.WHITE_IPTABLES) != 0) {
+			if (!HawkNetManager.getInstance().checkWhiteIptables(ipaddr)) {
+				HawkLog.logPrintln(String.format("session closed by white iptables, ipaddr: %s", ipaddr));
+				HawkApp.getInstance().onRefuseByIptables(session, ipaddr, IpUsage.WHITE_IPTABLES);
+				return false;
+			}
+		}
+
+		// 黑名单校验
+		if ((ipUsage & IpUsage.BLACK_IPTABLES) != 0) {
+			if (HawkNetManager.getInstance().checkBlackIptables(ipaddr)) {
+				HawkLog.logPrintln(String.format("session closed by black iptables, ipaddr: %s", ipaddr));
+				HawkApp.getInstance().onRefuseByIptables(session, ipaddr, IpUsage.BLACK_IPTABLES);
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	/**
 	 * 会话创建
 	 */
 	@Override
@@ -73,24 +110,12 @@ public class HawkIoHandler extends IoHandlerAdapter {
 			HawkException.catchException(e);
 		}
 		
-		// 白名单校验
-		if ((ipUsage & IpUsage.WHITE_IPTABLES) != 0) {
-			if (!HawkNetManager.getInstance().checkWhiteIptables(ipaddr)) {
-				HawkLog.logPrintln(String.format("session closed by white iptables, ipaddr: %s", ipaddr));
-				session.close(false);
-				return;
-			}
+		// ip检测
+		if (!checkIptables(session, ipaddr)) {
+			session.close(false);
+			return;
 		}
-
-		// 黑名单校验
-		if ((ipUsage & IpUsage.BLACK_IPTABLES) != 0) {
-			if (HawkNetManager.getInstance().checkBlackIptables(ipaddr)) {
-				HawkLog.logPrintln(String.format("session closed by black iptables, ipaddr: %s", ipaddr));
-				session.close(false);
-				return;
-			}
-		}
-
+		
 		try {
 			HawkSession hawkSession = new HawkSession();
 			if (hawkSession != null) {
@@ -101,7 +126,7 @@ public class HawkIoHandler extends IoHandlerAdapter {
 
 				// 最大会话数控制
 				if (HawkNetManager.getInstance().getSessionMaxSize() > 0) {
-					int curSession = HawkNetStatistics.getInstance().getCurSession();
+					int curSession = (int) HawkNetStatistics.getInstance().getCurSession();
 					if (curSession >= HawkNetManager.getInstance().getSessionMaxSize()) {
 						HawkLog.errPrintln(String.format("session maxsize limit, ipaddr: %s, total: %d", ipaddr, curSession));
 						session.close(false);
@@ -115,13 +140,6 @@ public class HawkIoHandler extends IoHandlerAdapter {
 			}
 		} catch (Exception e) {
 		}
-	}
-
-	/**
-	 * 开启回调
-	 */
-	@Override
-	public void sessionOpened(IoSession session) throws Exception {
 	}
 
 	/**

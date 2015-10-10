@@ -21,14 +21,15 @@ public class HawkCdkService {
 	public static final int CDK_STATUS_USED = 4; // 已使用
 	public static final int CDK_STATUS_PLAT = 5; // 平台不正确
 	public static final int CDK_STATUS_TYPE_MULTI = 6; // 已使用过相关类型
-	
+	public static final int CDK_STATUS_NOSERVICE = 7; // 服务关闭
+
 	/**
 	 * 后台操作错误码
 	 */
 	public static final int CDK_TYPE_EXIST = 10; // CDK类型已存在
 	public static final int CDK_PARAM_ERROR = 11; // 参数错误
 	public static final int CDK_TYPE_NONEXIST = 12; // 类型不存在
-	
+
 	/**
 	 * 常量定义
 	 */
@@ -37,7 +38,7 @@ public class HawkCdkService {
 	public static final int CDK_CHAR_MIN_COUNT = 3; // 字符最少个数
 	public static final int CDK_HEADER_SIZE = 2; // cdk标记字节
 	public static final int CDK_NAMT_TYPE_LEN = 8; // 名字和类型占用的长度
-	
+
 	/**
 	 * 服务器信息
 	 */
@@ -45,18 +46,23 @@ public class HawkCdkService {
 	private String platform = "";
 	private String serverId = "";
 	private String token = "";
-	
+
 	/**
 	 * http对象
 	 */
 	private HttpClient httpClient = null;
-	private GetMethod  getMethod  = null;
-	
+	private GetMethod getMethod = null;
+
 	/**
 	 * cdk服务参数串格式
 	 */
-	private static final String usePath  = "/use_cdk";
+	private static final String usePath = "/use_cdk";
 	private static final String useQuery = "game=%s&platform=%s&server=%s&playerid=%d&puid=%s&playername=%s&cdk=%s";
+
+	/**
+	 * 服务是否可用
+	 */
+	private boolean serviceEnable = true;
 
 	/**
 	 * 实例对象
@@ -93,13 +99,13 @@ public class HawkCdkService {
 			this.gameName = gameName;
 			this.platform = platform;
 			this.serverId = serverId;
-			
+
 			if (httpClient == null) {
 				httpClient = new HttpClient();
 				httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(timeout);
 				httpClient.getHttpConnectionManager().getParams().setSoTimeout(timeout);
 			}
-	
+
 			if (getMethod == null) {
 				getMethod = new GetMethod(host);
 			}
@@ -123,7 +129,7 @@ public class HawkCdkService {
 	public void setToken(String token) {
 		this.token = token;
 	}
-	
+
 	/**
 	 * 从cdk读取游戏名
 	 * 
@@ -153,15 +159,14 @@ public class HawkCdkService {
 	}
 
 	/**
-	 * 同类型限制多次使用
+	 * 开启或关闭服务
 	 * 
-	 * @param type
-	 * @return
+	 * @param enable
 	 */
-	public static boolean typeLimitMultiUse(String type) {
-		return true;
+	public void enableService(boolean enable) {
+		this.serviceEnable = enable;
 	}
-	
+
 	/**
 	 * 使用CDK, 外部需要先判断是否已使用过同类型的CDK
 	 * 
@@ -170,28 +175,33 @@ public class HawkCdkService {
 	 */
 	@SuppressWarnings({ "unchecked", "unused" })
 	public synchronized int useCdk(String puid, int playerid, String playername, String cdk, StringBuilder rewardRef) {
+		// 服务示范可用
+		if (!serviceEnable) {
+			return CDK_STATUS_NOSERVICE;
+		}
+
 		// 长度校验不正确
 		if (cdk.length() != CDK_TOTAL_LENGTH) {
 			return CDK_STATUS_NONEXIST;
 		}
-		
+
 		// 名字校验不正确
 		String cdkGameName = getGameNameFromCdk(cdk);
 		String cdkTypeName = getTypeNameFromCdk(cdk);
 		if (!gameName.startsWith(cdkGameName)) {
 			return CDK_STATUS_NONEXIST;
 		}
-		
+
 		if (httpClient != null && getMethod != null && cdk != null && cdk.length() == CDK_TOTAL_LENGTH) {
 			String queryParam = String.format(useQuery, gameName, platform, serverId, playerid, puid, playername, cdk);
 			try {
 				queryParam = URLEncoder.encode(queryParam, "UTF-8");
-				
+
 				// 添加令牌校验
 				if (token != null && token.length() > 0) {
 					queryParam += URLEncoder.encode("&token=" + token, "UTF-8");
 				}
-				
+
 			} catch (Exception e) {
 				HawkException.catchException(e);
 			}
@@ -207,7 +217,7 @@ public class HawkCdkService {
 					if (respMap.containsKey("status")) {
 						status = Integer.valueOf(respMap.get("status"));
 					}
-					
+
 					if (status == CDK_STATUS_OK && respMap.containsKey("reward")) {
 						rewardRef.delete(0, rewardRef.length()).append(respMap.get("reward"));
 					}

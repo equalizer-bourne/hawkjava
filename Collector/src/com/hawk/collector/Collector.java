@@ -14,9 +14,14 @@ public class Collector {
 	 * 系统token校验
 	 */
 	private static String httpToken = "";
+	private static boolean userLog = false;
 	
 	public static void setToken(String token) {
 		httpToken = token.trim();
+	}
+	
+	public static void setUserLogEnable(boolean enable) {
+		userLog = enable;
 	}
 	
 	public static boolean checkToken(String token) {
@@ -26,6 +31,10 @@ public class Collector {
 			}
 		}
 		return true;
+	}
+	
+	public static boolean isUserLogEnable() {
+		return userLog;
 	}
 	
 	/**

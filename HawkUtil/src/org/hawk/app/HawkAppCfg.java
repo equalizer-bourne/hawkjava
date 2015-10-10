@@ -13,22 +13,26 @@ public class HawkAppCfg extends HawkConfigBase {
 	 * 管理员
 	 */
 	protected final String admin;
-	/**
-	 * 是否允许控制台打印
+		/**
+	 * 游戏名
 	 */
-	protected final boolean console;
+	protected final String gameId;
 	/**
-	 * 调试模式
+	 * 平台名
 	 */
-	protected final boolean isDebug;
+	protected final String platform;
 	/**
-	 * 消息任务模式
+	 * 服务器id
 	 */
-	protected final boolean msgTaskMode;
+	protected final int serverId;
 	/**
-	 * 对象缓存
+	 * 网络接收器端口
 	 */
-	protected final boolean objCache;
+	protected final int acceptorPort;
+	/**
+	 * 脚本使用端口
+	 */
+	protected final int  scriptPort;
 	/**
 	 * 帧更新周期
 	 */
@@ -46,17 +50,9 @@ public class HawkAppCfg extends HawkConfigBase {
 	 */
 	protected final int dbThreads;
 	/**
-	 * 系统时间差异
+	 * 调试模式
 	 */
-	protected final long calendarOffset;
-	/**
-	 * 主机ip地址
-	 */
-	protected final String hostIp;
-	/**
-	 * 网络接收器端口
-	 */
-	protected final int acceptorPort;
+	protected final boolean isDebug;
 	/**
 	 * 是否为websocket
 	 */
@@ -65,6 +61,10 @@ public class HawkAppCfg extends HawkConfigBase {
 	 * 是否为http服务器
 	 */
 	protected final boolean isHttpServer;
+	/**
+	 * 系统时间差异
+	 */
+	protected final long calendarOffset;
 	/**
 	 * 会话缓冲区大小
 	 */
@@ -110,10 +110,6 @@ public class HawkAppCfg extends HawkConfigBase {
 	 */
 	protected final String dbPassWord;
 	/**
-	 * 数据库实体包路径
-	 */
-	protected final String entityPackages;
-	/**
 	 * 数据库异步落地线程周期
 	 */
 	protected final int dbAsyncPeriod;
@@ -121,6 +117,10 @@ public class HawkAppCfg extends HawkConfigBase {
 	 * 脚本配置文件
 	 */
 	protected final String scriptXml;
+	/**
+	 * 数据库实体包路径
+	 */
+	protected final String entityPackages;
 	/**
 	 * 配置文件包名
 	 */
@@ -138,26 +138,45 @@ public class HawkAppCfg extends HawkConfigBase {
 	 */
 	protected final long dbOpTimeout;
 	/**
-	 * 通知邮箱地址
+	 * cdk地址
 	 */
-	protected final String emailUser;
+	protected final String cdkHost;
 	/**
-	 * 邮箱密码
+	 * cdk超时
 	 */
-	protected final String emailPwd;
+	protected final int cdkTimeout;
+	/**
+	 * 数据上报地址
+	 */
+	protected final String reportHost;
+	/**
+	 * 数据上报超时
+	 */
+	protected final int reportTimeout;
+	/**
+	 * 订单服务地址
+	 */
+	protected final String orderAddr;
+	/**
+	 * 运维服务地址
+	 */
+	protected final String opsAgentAddr;
+	/**
+	 * 聊天服务地址
+	 */
+	protected final String chatAddr;
 	
 	public HawkAppCfg() {
 		admin = "hawk";
-		console = true;
+		gameId = "";
+		platform = "";
+		serverId = 0;
 		isDebug = true;
-		objCache = false;
-		msgTaskMode = true;
 		tickPeriod = 50;
 		threadNum = 4;
 		taskThreads = 0;
 		dbThreads = 0;
 		calendarOffset = 0;
-		hostIp = "";
 		acceptorPort = 0;
 		isWebSocket = false;
 		isHttpServer = false;
@@ -177,26 +196,36 @@ public class HawkAppCfg extends HawkConfigBase {
 		entityPackages = null;
 		dbAsyncPeriod = 600000;
 		scriptXml = null;
+		scriptPort = 0;
 		configPackages = null;
 		servicePath = null;
-		emailUser = "hawk_exception@163.com";
-		emailPwd = "hawk.dai";
+		cdkHost = "";
+		cdkTimeout = 1000;
+		reportHost = "";
+		reportTimeout = 1000;
+		orderAddr = "";
+		opsAgentAddr = "";
+		chatAddr = "";
 	}
 	
 	public String getAdmin() {
 		return admin;
 	}
 	
-	public boolean isConsole() {
-		return console;
+	public String getGameId() {
+		return gameId;
+	}
+
+	public String getPlatform() {
+		return platform;
+	}
+
+	public int getServerId() {
+		return serverId;
 	}
 
 	public boolean isDebug() {
 		return isDebug;
-	}
-
-	public boolean isMsgTaskMode() {
-		return msgTaskMode;
 	}
 	
 	public int getTickPeriod() {
@@ -217,10 +246,6 @@ public class HawkAppCfg extends HawkConfigBase {
 	
 	public long getCalendarOffset() {
 		return calendarOffset;
-	}
-
-	public String getHostIp() {
-		return hostIp;
 	}
 	
 	public int getAcceptorPort() {
@@ -290,6 +315,10 @@ public class HawkAppCfg extends HawkConfigBase {
 	public String getScriptXml() {
 		return scriptXml;
 	}
+	
+	public int getScriptPort() {
+		return scriptPort;
+	}
 
 	public String getConfigPackages() {
 		return configPackages;
@@ -299,10 +328,6 @@ public class HawkAppCfg extends HawkConfigBase {
 		return servicePath;
 	}
 
-	public boolean isObjCache() {
-		return objCache;
-	}
-	
 	public boolean isWebSocket() {
 		return isWebSocket;
 	}
@@ -311,11 +336,31 @@ public class HawkAppCfg extends HawkConfigBase {
 		return isHttpServer;
 	}
 	
-	public String getEmailUser() {
-		return emailUser;
+	public String getCdkHost() {
+		return cdkHost;
 	}
 
-	public String getEmailPwd() {
-		return emailPwd;
+	public int getCdkTimeout() {
+		return cdkTimeout;
+	}
+
+	public String getReportHost() {
+		return reportHost;
+	}
+
+	public int getReportTimeout() {
+		return reportTimeout;
+	}
+
+	public String getOrderAddr() {
+		return orderAddr;
+	}
+
+	public String getOpsAgentAddr() {
+		return opsAgentAddr;
+	}
+	
+	public String getChatAddr() {
+		return chatAddr;
 	}
 }

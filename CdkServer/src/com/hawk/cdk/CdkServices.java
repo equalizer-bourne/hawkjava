@@ -695,7 +695,7 @@ public class CdkServices {
 	 */
 	public boolean tick() {
 		// 每120s通信一次, 避免cmem的180s超时
-		int currentTime = (int) (Math.floor(System.currentTimeMillis() / 1000));
+		int currentTime = (int) (Math.floor(HawkTime.getMillisecond() / 1000));
 		if (currentTime - lastVisitTime >= 120000) {
 			try {
 				String author = memCachedClient.getString(MC_CDK_AUTHOR_KEY);

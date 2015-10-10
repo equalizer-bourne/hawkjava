@@ -50,7 +50,7 @@ public class ReportTutorialHandler implements HttpHandler {
 			
 			// 优先更新
 			String sql = String.format("UPDATE tutorial SET step = %d, args = '%s', playerlevel = %d, time = '%s', date = '%s' WHERE game = '%s' AND platform = '%s' AND server = '%s' AND puid = '%s'",
-					Integer.valueOf(params.get("step")), params.get("args"), params.get("playerlevel"), time, time.substring(0, 10),
+					Integer.valueOf(params.get("step")), params.get("args"), Integer.valueOf(params.get("playerlevel")), time, time.substring(0, 10),
 					params.get("game"), params.get("platform"), params.get("server"), params.get("puid"));
 			
 			if (DBManager.getInstance().executeSql(params.get("game"), sql) > 0) {

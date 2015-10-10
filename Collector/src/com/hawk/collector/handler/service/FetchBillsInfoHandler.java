@@ -46,11 +46,11 @@ public class FetchBillsInfoHandler implements HttpHandler {
 		JsonArray jsonArray = new JsonArray();
 		Statement statement = null;
 		try {
-			String sql = String.format("SELECT orderid, platform, server, puid, pay, currency, time FROM recharge WHERE game = '%s' AND date >= '%s' AND date <= '%s'", 
+			String sql = String.format("SELECT pforder, platform, server, puid, payMoney, currency, time FROM recharge WHERE game = '%s' AND date >= '%s' AND date <= '%s'", 
 					game, beginDate, endDate);
 			
 			if (channel != null && channel.length() > 0) {
-				sql = String.format("SELECT orderid, platform, server, puid, pay, currency, time FROM recharge WHERE game = '%s' AND channel = '%s' AND date >= '%s' AND date <= '%s'", 
+				sql = String.format("SELECT pforder, platform, server, puid, payMoney, currency, time FROM recharge WHERE game = '%s' AND channel = '%s' AND date >= '%s' AND date <= '%s'", 
 						game, channel, beginDate, endDate);
 			}
 			

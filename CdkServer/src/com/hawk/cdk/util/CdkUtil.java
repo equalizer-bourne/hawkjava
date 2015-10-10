@@ -1,12 +1,12 @@
 package com.hawk.cdk.util;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.hawk.log.HawkLog;
+import org.hawk.os.HawkTime;
 
 import com.hawk.cdk.data.CdkTypeReward;
 
@@ -70,6 +70,6 @@ public class CdkUtil {
 	 */
 	public static String getDateString() {
 		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
-		return dateFormat.format(Calendar.getInstance().getTime());
+		return dateFormat.format(HawkTime.getCalendar().getTime());
 	}
 }

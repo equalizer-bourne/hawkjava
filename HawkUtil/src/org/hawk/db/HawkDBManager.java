@@ -124,7 +124,7 @@ public class HawkDBManager implements Runnable {
 		
 		try {
 			if (this.conf == null) {
-				String fileName = HawkApp.getInstance().getWorkPath() + hbmXml;
+				String fileName = HawkOSOperator.getWorkPath() + hbmXml;
 				this.conf = new Configuration();
 				this.conf.configure(new File(fileName));
 			}
@@ -147,14 +147,8 @@ public class HawkDBManager implements Runnable {
 					}
 				}
 			}
-
 			this.running = true;
-			this.sessionFactory = this.conf.buildSessionFactory();
-			if (HawkApp.getInstance().getAppCfg().isDebug()) {
-				HawkLog.logPrintln(String.format("init database, connUrl: %s, userName: %s, pwd: %s, hbmXml: %s", connUrl, userName, passWord, hbmXml));
-			} else {
-				HawkLog.logPrintln(String.format("init database, connUrl: %s, userName: ******, pwd: ******, hbmXml: %s", connUrl, hbmXml));
-			}
+			HawkLog.logPrintln(String.format("init database, connUrl: %s, userName: %s, pwd: %s, hbmXml: %s", connUrl, userName, passWord, hbmXml));
 			return true;
 		} catch (Exception e) {
 			HawkException.catchException(e);
@@ -162,6 +156,34 @@ public class HawkDBManager implements Runnable {
 		return false;
 	}
 
+	/**
+	 * 构建会话工厂
+	 */
+	public boolean buildSessionFactory() {
+		if (this.conf != null && this.sessionFactory == null) {
+			this.sessionFactory = this.conf.buildSessionFactory();
+			return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * 返回数据库配置对象
+	 * 
+	 * @return
+	 */
+	public Configuration getConfiguration() {
+		return conf;
+	}
+	
+	/**
+	 * 返回会话工厂
+	 * @return
+	 */
+	public SessionFactory getSessionFactory() {
+		return sessionFactory;
+	}
+	
 	/**
 	 * 开启异步线程
 	 * 
@@ -222,6 +244,8 @@ public class HawkDBManager implements Runnable {
 				HawkException.catchException(e);
 			}
 		}
+		
+		HawkLog.logPrintln("stop db manager");
 	}
 	
 	/**
@@ -250,6 +274,8 @@ public class HawkDBManager implements Runnable {
 			sessionFactory.close();
 			sessionFactory = null;
 		}
+		
+		HawkLog.logPrintln("close db manager");
 	}
 
 	/**
@@ -258,6 +284,12 @@ public class HawkDBManager implements Runnable {
 	 * @return
 	 */
 	public Session getSession() {
+		if (sessionFactory == null) {
+			synchronized (SessionFactory.class) {
+				buildSessionFactory();
+			}
+		}
+		
 		if (sessionFactory != null) {
 			return sessionFactory.getCurrentSession();
 		}
@@ -295,24 +327,28 @@ public class HawkDBManager implements Runnable {
 	 * @param entity
 	 */
 	public boolean create(HawkDBEntity entity) {
-		long beginTimeMs = HawkTime.getMillisecond();
-		try {
-			Session session = getSession();
-			Transaction trans = session.beginTransaction();
+		if (entity != null) {
+			entity.setCreateTime(HawkTime.getCalendar().getTime());
+			entity.setUpdateTime(HawkTime.getCalendar().getTime());
+			long beginTimeMs = HawkTime.getMillisecond();
 			try {
-				session.save(entity);
-				trans.commit();
-				return true;
+				Session session = getSession();
+				Transaction trans = session.beginTransaction();
+				try {
+					session.save(entity);
+					trans.commit();
+					return true;
+				} catch (Exception e) {
+					trans.rollback();
+					HawkException.catchException(e);
+				}
 			} catch (Exception e) {
-				trans.rollback();
 				HawkException.catchException(e);
-			}
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		} finally {
-			long costTimeMs = HawkTime.getMillisecond() - beginTimeMs;
-			if (costTimeMs > HawkApp.getInstance().getAppCfg().getDbOpTimeout()) {
-				HawkLog.logPrintln("dbmanager.create timeout, entity: " + entity.getClass().getSimpleName() + ", costtime: " + costTimeMs);
+			} finally {
+				long costTimeMs = HawkTime.getMillisecond() - beginTimeMs;
+				if (costTimeMs > HawkApp.getInstance().getAppCfg().getDbOpTimeout()) {
+					HawkLog.logPrintln("dbmanager.create timeout, entity: " + entity.getClass().getSimpleName() + ", costtime: " + costTimeMs);
+				}
 			}
 		}
 		return false;
@@ -324,25 +360,27 @@ public class HawkDBManager implements Runnable {
 	 * @param entity
 	 */
 	public boolean delete(HawkDBEntity entity) {
-		long beginTimeMs = HawkTime.getMillisecond();
-		try {
-			Session session = getSession();
-			Transaction trans = session.beginTransaction();
+		if (entity != null) {
+			long beginTimeMs = HawkTime.getMillisecond();
 			try {
-				session.delete(entity);
-				trans.commit();
-				return true;
+				Session session = getSession();
+				Transaction trans = session.beginTransaction();
+				try {
+					session.delete(entity);
+					trans.commit();
+					return true;
+				} catch (Exception e) {
+					trans.rollback();
+					HawkException.catchException(e);
+					HawkLog.errPrintln("dbmanager delete entity failed: " + entity.getClass().getName() + ", entity: " + entity);
+				}
 			} catch (Exception e) {
-				trans.rollback();
 				HawkException.catchException(e);
-				HawkLog.errPrintln("dbmanager delete entity failed: " + entity.getClass().getName() + ", entity: " + entity);
-			}
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		} finally {
-			long costTimeMs = HawkTime.getMillisecond() - beginTimeMs;
-			if (costTimeMs > HawkApp.getInstance().getAppCfg().getDbOpTimeout()) {
-				HawkLog.logPrintln("dbmanager.delete timeout, entity: " + entity.getClass().getSimpleName() + ", costtime: " + costTimeMs);
+			} finally {
+				long costTimeMs = HawkTime.getMillisecond() - beginTimeMs;
+				if (costTimeMs > HawkApp.getInstance().getAppCfg().getDbOpTimeout()) {
+					HawkLog.logPrintln("dbmanager.delete timeout, entity: " + entity.getClass().getSimpleName() + ", costtime: " + costTimeMs);
+				}
 			}
 		}
 		return false;
@@ -538,7 +576,7 @@ public class HawkDBManager implements Runnable {
 			HawkException.catchException(e);
 		} finally {
 			long costTimeMs = HawkTime.getMillisecond() - beginTimeMs;
-			if (costTimeMs > HawkApp.getInstance().getAppCfg().getDbOpTimeout()) {
+			if (HawkApp.getInstance() != null && costTimeMs > HawkApp.getInstance().getAppCfg().getDbOpTimeout()) {
 				HawkLog.logPrintln("dbmanager.query timeout, hql: " + hql + ", costtime: " + costTimeMs);
 			}
 		}
@@ -644,6 +682,7 @@ public class HawkDBManager implements Runnable {
 			} catch (Exception e) {
 				trans.rollback();
 				HawkException.catchException(e);
+				HawkLog.logPrintln("executeQuery failed: " + sql);
 			}
 		} catch (Exception e) {
 			HawkException.catchException(e);
@@ -675,6 +714,7 @@ public class HawkDBManager implements Runnable {
 			} catch (Exception e) {
 				trans.rollback();
 				HawkException.catchException(e);
+				HawkLog.logPrintln("executeQuery failed: " + sql);
 			}
 		} catch (Exception e) {
 			HawkException.catchException(e);
@@ -718,6 +758,7 @@ public class HawkDBManager implements Runnable {
 			} catch (Exception e) {
 				trans.rollback();
 				HawkException.catchException(e);
+				HawkLog.logPrintln("executeQuery failed: " + sql);
 			}
 		} catch (Exception e) {
 			HawkException.catchException(e);

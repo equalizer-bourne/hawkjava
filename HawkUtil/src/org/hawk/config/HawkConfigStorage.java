@@ -94,7 +94,7 @@ public class HawkConfigStorage {
 		if (cfgClass.getAnnotation(HawkConfigManager.XmlResource.class) != null) {
 			HawkConfigManager.XmlResource xmlRes = cfgClass.getAnnotation(HawkConfigManager.XmlResource.class);
 
-			filePath = HawkApp.getInstance().getWorkPath() + xmlRes.file();
+			filePath = HawkOSOperator.getWorkPath() + xmlRes.file();
 			HawkLog.logPrintln("load config: " + filePath);
 
 			if ("map".equals(xmlRes.struct())) {

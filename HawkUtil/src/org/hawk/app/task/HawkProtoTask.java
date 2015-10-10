@@ -1,7 +1,6 @@
 package org.hawk.app.task;
 
 import org.hawk.app.HawkApp;
-import org.hawk.cache.HawkCache;
 import org.hawk.cache.HawkCacheObj;
 import org.hawk.log.HawkLog;
 import org.hawk.net.protocol.HawkProtocol;
@@ -16,10 +15,6 @@ import org.hawk.xid.HawkXID;
  * 
  */
 public class HawkProtoTask extends HawkTask {
-	/**
-	 * 任务缓存
-	 */
-	private static HawkCache taskCache = null;
 	/**
 	 * 对象id
 	 */
@@ -67,9 +62,6 @@ public class HawkProtoTask extends HawkTask {
 		// 清理对象
 		xid = null;
 		protocol = null;
-		
-		// 释放本对象
-		release(this);
 	}
 
 	/**
@@ -91,8 +83,6 @@ public class HawkProtoTask extends HawkTask {
 				if (!dispatchOK) {
 					HawkLog.errPrintln("dispatch protocol failed, protocolId: " + protocol.getType());
 				}
-				// 释放协议
-				HawkProtocol.release(protocol);
 			}
 		} catch (Exception e) {
 			HawkException.catchException(e);
@@ -101,35 +91,12 @@ public class HawkProtoTask extends HawkTask {
 	}
 
 	/**
-	 * 设置对象缓存
-	 * @param cache
-	 */
-	public static void setCache(HawkCache cache) {
-		taskCache = cache;
-	}
-	
-	/**
-	 * 释放对象
-	 * @param task
-	 */
-	public static void release(HawkProtoTask task) {
-		if (taskCache != null) {
-			taskCache.release(task);
-		}
-	}
-	
-	/**
 	 * 创建协议任务的统一出口
 	 * 
 	 * @return
 	 */
 	public static HawkProtoTask valueOf() {
-		HawkProtoTask task = null;
-		if (taskCache != null) {
-			task = taskCache.create();
-		} else {
-			task = new HawkProtoTask();
-		}
+		HawkProtoTask task = new HawkProtoTask();
 		return task;
 	}
 	
@@ -142,12 +109,7 @@ public class HawkProtoTask extends HawkTask {
 	 * @return
 	 */
 	public static HawkProtoTask valueOf(HawkXID xid, HawkProtocol protocol) {
-		HawkProtoTask task = null;
-		if (taskCache != null) {
-			task = taskCache.create();
-		} else {
-			task = new HawkProtoTask();
-		}
+		HawkProtoTask task = new HawkProtoTask();
 		task.setParam(xid, protocol);
 		return task;
 	}

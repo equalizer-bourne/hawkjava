@@ -186,7 +186,7 @@ public class HawkMsgTask extends HawkTask {
 	 */
 	private int onRpcMessage() {
 		// rpc请求
-		if (msg.getType() == HawkMsg.MSG_RPC_REQ) {
+		if (msg.getType() == HawkMsg.MSG_RPC_REQ || msg.getType() == HawkMsg.MSG_RPC_RESP) {
 			HawkObjBase<HawkXID, HawkAppObj> objBase = HawkApp.getInstance().lockObject(msg.getTarget());
 			if (objBase != null) {
 				try {

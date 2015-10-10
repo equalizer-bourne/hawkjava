@@ -5,12 +5,15 @@
 		<port>9001</port>
 		<pool>4</pool>
 		<token></token>
+		<userlog>true</userlog>
 	</httpserver>
 	
+	<!-- 
 	<zmqserver>
-		<addr>tcp://0.0.0.0:9901</addr>
+		<addr>tcp://0.0.0.0:9002</addr>
 		<pool>8</pool>
 	</zmqserver>
+	-->
 	
 	<database>
 		<dbHost>127.0.0.1:3306</dbHost>

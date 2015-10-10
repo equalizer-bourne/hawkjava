@@ -20,7 +20,9 @@ public abstract class HawkTickable {
 	/**
 	 * 获取名字
 	 */
-	public abstract String getName();
+	public String getName() {
+		return this.getClass().getSimpleName();
+	}
 	
 	/**
 	 * 是否有效

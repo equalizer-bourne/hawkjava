@@ -40,6 +40,11 @@ public class HawkEncoder extends ProtocolEncoderAdapter {
 			buffer = encodeProtocol((HawkClientSession) attrObject, message);
 		}
 		
+		// 直接会话发送IoBuffer数据
+		if (attrObject == null && message instanceof IoBuffer) {
+			buffer = (IoBuffer) message;
+		}
+		
 		if (buffer != null) {
 			output.write(buffer);
 			// 统计更新信息
@@ -82,7 +87,6 @@ public class HawkEncoder extends ProtocolEncoderAdapter {
 					return IoBuffer.wrap(byteBuffer);
 				}
 			} finally {
-				HawkProtocol.release(protocol);
 				session.unlock();
 			}
 		}
@@ -118,7 +122,6 @@ public class HawkEncoder extends ProtocolEncoderAdapter {
 					return frameBuffer;
 				}
 			} finally {
-				HawkProtocol.release(protocol);
 				session.unlock();
 			}
 		}

@@ -303,6 +303,7 @@ public class HawkMsg {
 	 * 创建消息对象
 	 * 
 	 * @param msg
+	 * @param target
 	 * @return
 	 */
 	public static HawkMsg valueOf(int msg, HawkXID target) {
@@ -314,7 +315,23 @@ public class HawkMsg {
 	/**
 	 * 创建消息对象
 	 * 
+	 * @param target
+	 * @param source
+	 * @return
+	 */
+	public static HawkMsg valueOf(HawkXID source, HawkXID target) {
+		HawkMsg hawkMsg = new HawkMsg(0);
+		hawkMsg.setSource(source);
+		hawkMsg.setTarget(target);
+		return hawkMsg;
+	}
+	
+	/**
+	 * 创建消息对象
+	 * 
 	 * @param msg
+	 * @param target
+	 * @param source
 	 * @return
 	 */
 	public static HawkMsg valueOf(int msg, HawkXID target, HawkXID source) {

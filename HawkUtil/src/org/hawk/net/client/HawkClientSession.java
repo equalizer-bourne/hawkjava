@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import org.apache.mina.core.buffer.IoBuffer;
 import org.apache.mina.core.future.ConnectFuture;
 import org.apache.mina.core.service.IoConnector;
+import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
 import org.hawk.cryption.HawkDecryption;
 import org.hawk.cryption.HawkEncryption;
@@ -61,26 +62,30 @@ public abstract class HawkClientSession {
 	 */
 	public boolean connect(String ip, int port, int timeoutMs) {
 		try {
+			// 创建缓冲区
+			inBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
+			outBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
+			
+			// 操作连接器
 			IoConnector connector = HawkNetManager.getInstance().getConnector();
-
 			connector.setConnectTimeoutMillis(timeoutMs);
 			ConnectFuture future = connector.connect(new InetSocketAddress(ip, port));
 			future.awaitUninterruptibly();
+			// 获取会话对象
 			session = future.getSession();
 			if (session != null) {
-				// 设置读取数据的缓冲区大小
-				session.getConfig().setReadBufferSize(HawkNetManager.getInstance().getSessionBufSize());
 				// 加解密组件
 				if (HawkNetManager.getInstance().enableEncryption()) {
 					setEncryption(new HawkEncryption());
 					setDecryption(new HawkDecryption());
 				}
-				this.active = true;
 				// 绑定本地会话对象
-				this.session.setAttribute(HawkSession.SESSION_ATTR, this);
-				// 创建缓冲区
-				inBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
-				outBuffer = IoBuffer.allocate(HawkNetManager.getInstance().getSessionBufSize()).setAutoExpand(true);
+				session.setAttribute(HawkSession.SESSION_ATTR, this);
+				// 设置读取数据的缓冲区大小
+				session.getConfig().setReadBufferSize(HawkNetManager.getInstance().getSessionBufSize());
+				// 读写通道无操作进入空闲状态
+				session.getConfig().setIdleTime(IdleStatus.BOTH_IDLE, HawkNetManager.getInstance().getSessionIdleTime());
+				active = true;
 				return true;
 			}
 		} catch (Exception e) {

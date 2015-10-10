@@ -1,0 +1,10 @@
+qmby^LuaError^Win32^10005^37wan_kisszhuxi^simulator#7#windows#win32^ram#cpuCores#maxCpuFreq
+CocoError in 2015-07-16-12-24-06[string "MainScene/MScenePage.lua"]:442: wrong
+stack traceback:
+	[string "CocoDebug.lua"]:12: in function <[string "CocoDebug.lua"]:11>
+	[C]: ?
+	[C]: in function 'assert'
+	[string "MainScene/MScenePage.lua"]:442: in function '?'
+	[string "CommonPage.lua"]:111: in function <[string "CommonPage.lua"]:109>
+	[C]: in function 'xpcall'
+	[string "CommonPage.lua"]:109: in function <[string "CommonPage.lua"]:106>

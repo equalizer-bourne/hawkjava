@@ -18,7 +18,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 /**
- * 获取服务器信息
  * 
  * @author hawk
  */

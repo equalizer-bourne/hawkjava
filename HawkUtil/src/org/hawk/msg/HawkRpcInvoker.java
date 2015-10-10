@@ -9,6 +9,26 @@ import org.hawk.app.HawkAppObj;
  */
 public abstract class HawkRpcInvoker {
 	/**
+	 * 携带参数
+	 */
+	protected Object[] params;
+	
+	/**
+	 * 默认构造
+	 */
+	public HawkRpcInvoker() {
+	}
+	
+	/**
+	 * 携带应用逻辑层参数, 常用
+	 * 
+	 * @param params
+	 */
+	public HawkRpcInvoker(Object... params) {
+		this.params = params;
+	}
+	
+	/**
 	 * 消息响应
 	 * 
 	 * @param targetObj

@@ -13,6 +13,8 @@ import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -22,6 +24,8 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.swing.ListModel;
 
+import net.sf.json.JSONObject;
+
 import org.apache.commons.mail.Email;
 import org.apache.commons.mail.SimpleEmail;
 import org.hawk.app.HawkApp;
@@ -30,6 +34,9 @@ import org.hawk.app.HawkAppObj;
 import org.hawk.cryption.HawkAESCrypt;
 import org.hawk.cryption.HawkDESCrypt;
 import org.hawk.cryption.HawkRsaCrypt;
+import org.hawk.db.mysql.HawkMysqlSession;
+import org.hawk.game.astar.HawkAStarFinder;
+import org.hawk.log.HawkLog;
 import org.hawk.net.protocol.HawkProtocol;
 import org.hawk.os.HawkException;
 import org.hawk.os.HawkOSOperator;
@@ -37,9 +44,11 @@ import org.hawk.os.HawkRand;
 import org.hawk.os.HawkTime;
 import org.hawk.rpc.HawkRpcServer;
 import org.hawk.rpc.HawkRpcWorker;
+import org.hawk.thread.HawkThread;
 import org.hawk.timer.HawkTimerEntry;
 import org.hawk.timer.HawkTimerListener;
 import org.hawk.timer.HawkTimerManager;
+import org.hawk.util.services.HawkOrderService;
 import org.hawk.util.services.HawkReportService;
 import org.hawk.util.services.HawkReportService.CommonData;
 import org.hawk.util.services.HawkReportService.LoginData;
@@ -80,140 +89,60 @@ public class HawkMain {
 
 		while (true) {
 			rpcServer.onTick();
-
 			HawkOSOperator.osSleep(20);
 		}
 	}
-
-	private static void testAlarm() {
-		HawkTimerManager.getInstance().init(false);
-		try {
-			HawkTimerManager.getInstance().addAlarm("test", 5, true, new HawkTimerListener() {
-				@Override
-				public void handleAlarm(HawkTimerEntry entry) {
-					System.err.println("Alarm: " + HawkTime.getTimeString());
-				}
-			});
-
-			System.in.read();
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		}
-	}
-
-	private static void testCrypt() {
-		try {
-			// 用户密钥
-			byte[] keyValue = new byte[] { 22, 25, -35, -45, 25, 98, -55, -45, 10, 35, -45, 25, 26, -95, 25, -65, -78, -99, 85, 45, -62, 10, -0, 11, -35, 48, -98, 65, -32, 14, -78, 25, 36, -56, -45, -45, 12, 15, -35, -75, 15, -14, 62, -25, 33, -45, 55, 68, -88 };
-
-			HawkAESCrypt crypt1 = new HawkAESCrypt();
-			crypt1.init(keyValue, true);
-			byte[] encrypt = crypt1.digit("hawk".getBytes());
-
-			HawkAESCrypt crypt2 = new HawkAESCrypt();
-			crypt2.init(keyValue, false);
-			System.out.println(new String(crypt2.digit(encrypt)));
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		}
-	}
-
-	private static void testReport() {
-		HawkReportService.getInstance().install("lz", "ios", "1", "http://127.0.0.1:9010", 2000, null);
-		/*
-		 * RegisterData registerData = new RegisterData("91_123456", "abc-def", 1, ""); HawkReportService.getInstance().doReport(registerData);
-		 * 
-		 * LoginData loginData = new LoginData("91_123456", "abc-def", 1, ""); HawkReportService.getInstance().doReport(loginData);
-		 * 
-		 * RechargeData rechargeData = new RechargeData("91_123456", "abc-def", 1, "四叶草", 10, "1234567890", 1000, "rmb", ""); HawkReportService.getInstance().doReport(rechargeData);
-		 * 
-		 * CommonData commonData = new CommonData("91_123456", "abc-def", 1, ""); commonData.setArgs("10", "四叶草"); HawkReportService.getInstance().doReport(commonData);
-		 */
-	}
-
-	public static void testEmail() {
-		try {
-			Email email = new SimpleEmail();
-			email.setHostName("smtp.163.com");
-			email.setSmtpPort(25);
-			email.setAuthentication("hawkproject@163.com", "******");
-			email.setCharset("UTF-8");
-			email.setFrom("hawkproject@163.com");
-			email.addTo("daijunhua@com4loves.com");
-			email.setSubject("数据汇报邮件");
-			email.setMsg("游戏数据: ");
-			email.send();
-		} catch (Exception e) {
-			HawkException.catchException(e);
-		}
-	}
-
-	private static void dutyOrder() {
-		List<String> client = Arrays.asList("赵路", "周桐", "美琪");
-		List<String> server = Arrays.asList("鹏飞", "徐林", "戴俊华");
-		
-		HawkRand.randomOrder(client);
-		HawkRand.randomOrder(server);
-		
-		System.out.println(client);
-		System.out.println(server);
-	}
 	
+	private static void genOrder(String suuid, String game, String platform, int serverId,
+			int playerId, String puid, String device, String productId, int costMoney) {
+		
+		String channel = "";
+		int pos = puid.indexOf("_");
+		if (pos > 0) {
+			channel = puid.substring(0, pos).toLowerCase();
+		}
+		
+		// 初始化
+		HawkOrderService.getInstance().init(suuid, "123.59.62.233:9005", game, platform, serverId);
+		
+		HawkOSOperator.osSleep(2000);
+		
+		// 生成订单
+		HawkOrderService.getInstance().generateOrder(channel, playerId, puid, device, productId, costMoney, "rmb");
+		
+		// 执行callback
+		// INSERT INTO callback(myOrder,payMoney,pfOrder,date,createTime) values('*', 0, UUID(), CURDATE(), NOW());
+	}
+		
 	/**
 	 * 测试主函数入口
 	 * 
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		new HawkApp(HawkXID.valueOf(0)) {
-		};
-
-		// System.out.println(HawkRsaCrypt.generateKeyPair(1024));
-		
-		dutyOrder();
-		
-		filterGameJs();
-	}
-
-	private static void filterGameJs() {
-		try {
-			List<String> fileLines = new LinkedList<String>();
-			HawkOSOperator.readTextFileLines(System.getProperty("user.dir") + "/game.js", fileLines);
-			int lineIndex = 0;
-			for (int i=0; i<fileLines.size(); i++) {
-				String lineContent = fileLines.get(i);
-				int pos = lineContent.indexOf(".prototype.__class__");
-				if (pos > 0 && lineContent.indexOf("\";") > pos) {
-					String className = lineContent.substring(0, pos);
-					String fileContent = "";
-					for (int j=lineIndex; j<=i; j++) {
-						lineContent = fileLines.get(j).trim();
-						if (lineContent.length() > 0) {
-							fileContent += fileLines.get(j);
-							fileContent += "\r\n";
-						}
-					}
-					// System.out.println(fileContent);
-					saveAsFile(fileContent, "game/" + className + ".js");
-					lineIndex = i + 1;
+		int newUser = 5000;
+		for (int i=1; i<=30; i++) {
+			int oldUser = 0;
+			for (int j=1; j<=i-1; j++) {
+				if (i-j <= 1) {
+					oldUser += 2000;
+				} else if (i-j <= 2) {
+					oldUser += 1250;
+				} else if (i-j <= 6) {
+					oldUser += 1000;
+				} else {
+					oldUser += 750;
 				}
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
+			int activeUser = newUser + oldUser;
+			
+			System.out.println(activeUser + "\t" + activeUser * 4);
 		}
-	}
-	
-	private static void saveAsFile(String contentItem, String filePath) throws IOException {
-		// 打印文件名
-		System.out.println(filePath);
 		
-		File file = new File(filePath);
-		if (!file.exists()) {
-			file.createNewFile();
-		}
-		FileWriter fw = new FileWriter(file.getAbsoluteFile());
-		BufferedWriter bw = new BufferedWriter(fw);
-		bw.write(contentItem);
-		bw.close();
+		HawkApp app = new HawkApp(HawkXID.valueOf(0)) {
+		};
+		
+		
+		app.run();
 	}
 }

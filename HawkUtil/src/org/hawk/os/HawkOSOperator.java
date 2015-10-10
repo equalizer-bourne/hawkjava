@@ -1,10 +1,13 @@
 package org.hawk.os;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -14,6 +17,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
+import java.net.InetAddress;
 import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -23,7 +27,11 @@ import java.util.Properties;
 
 import net.sf.json.JSONObject;
 
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.GetMethod;
 import org.hawk.log.HawkLog;
+import org.hawk.nativeapi.HawkNativeApi;
 
 import com.sun.net.httpserver.HttpExchange;
 
@@ -239,7 +247,7 @@ public class HawkOSOperator {
 	 */
 	public static void sleep() {
 		try {
-			Thread.sleep(10);
+			Thread.sleep(5);
 		} catch (Exception e) {
 			HawkException.catchException(e);
 		}
@@ -311,6 +319,9 @@ public class HawkOSOperator {
 		// 系统路径
 		String homeDir = System.getProperty("java.home");
 		HawkLog.logPrintln("JavaHome: " + homeDir);
+		
+		// 进程ID
+		HawkLog.logPrintln("ProcessId: " + HawkOSOperator.getProcessId());
 	}
 
 	/**
@@ -515,6 +526,23 @@ public class HawkOSOperator {
 		}
 	}
 	
+	public static boolean saveAsFile(String fileContent, String filePath) {
+		try {
+			File file = new File(filePath);
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+			BufferedWriter bw = new BufferedWriter(fw);
+			bw.write(fileContent);
+			bw.close();
+			return true;
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return false;
+	}
+	
 	/**
 	 * json字符串转换为map对象
 	 * 
@@ -709,9 +737,9 @@ public class HawkOSOperator {
 		try {
 			String uriPath = httpExchange.getRequestURI().getPath();
 			String uriQuery = httpExchange.getRequestURI().getQuery();
-			if (uriQuery != null && uriQuery.length() > 0) {
+			if (uriPath != null && uriQuery != null && uriQuery.length() > 0) {
 				uriQuery = URLDecoder.decode(uriQuery, "UTF-8");
-				HawkLog.logPrintln("UriQuery: " + uriPath + "?" + uriQuery);
+				HawkLog.debugPrintln("UriQuery: " + uriPath + "?" + uriQuery);
 				if (uriQuery != null) {
 					String[] querys = uriQuery.split("&");
 					for (String query : querys) {
@@ -726,6 +754,30 @@ public class HawkOSOperator {
 			HawkException.catchException(e);
 		}
 		return paramMap;
+	}
+	
+	/**
+	 * 读取http客户端post过来的数据
+	 * 
+	 * @param httpExchange
+	 * @return
+	 */
+	public static String readRequestBody(HttpExchange httpExchange) {
+		String contentBody = "";
+		try {
+			InputStream inputStream = httpExchange.getRequestBody();
+	        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));  
+	        String line = null;  
+	        while((line = reader.readLine()) != null) {
+	        	if (contentBody.length() > 0) {
+	        		contentBody += "\r\n";
+	        	}
+	        	contentBody += line;
+	        }
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+        return contentBody;
 	}
 	
 	/**
@@ -746,5 +798,85 @@ public class HawkOSOperator {
 				HawkException.catchException(e);
 			}
 		}
+	}
+	
+	/**
+	 * 返回系统当前工作路径
+	 * 
+	 * @return
+	 */
+	public static String getWorkPath() {
+		return System.getProperty("user.dir") + File.separator;
+	}
+	
+	/**
+	 * 初始化lib目录环境
+	 * @return
+	 */
+	public static boolean installLibPath() {
+		// 添加库加载目录
+		HawkOSOperator.addUsrPath(System.getProperty("user.dir") + "/lib");
+		HawkOSOperator.addUsrPath(System.getProperty("user.dir") + "/hawk");
+		new File(".").list(new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name) {
+				if (dir.isDirectory() && name.endsWith("lib")) {
+					HawkOSOperator.addUsrPath(System.getProperty("user.dir") + "/" + name);
+					return true;
+				}
+				return false;
+			}
+		});
+
+		try {
+			// 初始化
+			System.loadLibrary("hawk");
+			if (!HawkNativeApi.initHawk()) {
+				return false;
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return true;
+	}
+	
+	/**
+	 * 获取自己的ip
+	 * 
+	 * @return
+	 */
+	public static String getMyIp(int timeout) {
+		HttpClient httpClient = new HttpClient();
+		httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(timeout);
+		httpClient.getHttpConnectionManager().getParams().setSoTimeout(timeout);
+		GetMethod getMethod  = new GetMethod("http://www.feefoxes.com");
+		getMethod.setPath("/myip.php");
+		try {
+			int statusCode = httpClient.executeMethod(getMethod);
+			if (statusCode == HttpStatus.SC_OK) {
+				String response = getMethod.getResponseBodyAsString();
+				HawkLog.logPrintln("myip: " + response);
+				return response;
+			}
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return "";
+	}
+	
+	/**
+	 * 获取自己的ip
+	 * 
+	 * @return
+	 */
+	public static String getLocalIp() {
+		try {
+			String ip = InetAddress.getLocalHost().getHostAddress();
+			HawkLog.logPrintln("localip: " + ip);
+			return ip;
+		} catch (Exception e) {
+			HawkException.catchException(e);
+		}
+		return "127.0.0.1";
 	}
 }

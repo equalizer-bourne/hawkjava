@@ -219,6 +219,10 @@ public class HawkConfigManager {
 	 * 更新加载
 	 */
 	public boolean updateReload() {
+		// 更新注册变量
+		HawkVariableManager.getInstance().updateVariable();
+		
+		// 更新配置文件
 		backupStorages.clear();
 		backupStorages.putAll(storages);
 		List<HawkConfigStorage> needCheckList = new LinkedList<>();

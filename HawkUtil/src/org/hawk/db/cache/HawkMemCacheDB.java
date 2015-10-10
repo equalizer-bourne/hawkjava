@@ -69,7 +69,10 @@ public class HawkMemCacheDB {
 	 */
 	public String getString(String key) {
 		if (memCachedClient != null) {
-			return (String)memCachedClient.get(key);
+			Object value = memCachedClient.get(key);
+			if (value != null) {
+				return (String)value;
+			}
 		} else if (jedisPool != null) {
 			try (Jedis jedis = jedisPool.getResource()) {
 				return jedis.get(key);
@@ -85,7 +88,10 @@ public class HawkMemCacheDB {
 	 */
 	public byte[] getBytes(String key) {
 		if (memCachedClient != null) {
-			return (byte[])memCachedClient.get(key);
+			Object value = memCachedClient.get(key);
+			if (value != null) {
+				return (byte[])value;
+			}
 		} else if (jedisPool != null) {
 			try (Jedis jedis = jedisPool.getResource()) {
 				return jedis.get(key.getBytes());
@@ -137,7 +143,7 @@ public class HawkMemCacheDB {
 	public boolean setString(String key, String value, int expireSeconds) {
 		if (memCachedClient != null) {
 			Date expiry = HawkTime.getCalendar().getTime();
-			expiry.setTime(expiry.getTime() + expireSeconds);
+			expiry.setTime(expiry.getTime() + expireSeconds * 1000);
 			return memCachedClient.set(key, value, expiry);
 		} else if (jedisPool != null) {
 			try (Jedis jedis = jedisPool.getResource()) {
@@ -158,7 +164,7 @@ public class HawkMemCacheDB {
 	public boolean setBytes(String key, byte[] value, int expireSeconds) {
 		if (memCachedClient != null) {
 			Date expiry = HawkTime.getCalendar().getTime();
-			expiry.setTime(expiry.getTime() + expireSeconds);
+			expiry.setTime(expiry.getTime() + expireSeconds * 1000);
 			return memCachedClient.set(key, value, expiry);
 		} else if (jedisPool != null) {
 			try (Jedis jedis = jedisPool.getResource()) {
